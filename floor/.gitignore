@@ -1,0 +1,14 @@
+# Jupyter Notebook
+.ipynb_checkpoints
+
+model_best_val_loss_var.pkl
+__pycache__/
+data/
+floortrans/models/
+### Vim ###
+# Swap
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
