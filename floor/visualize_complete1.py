@@ -118,7 +118,7 @@ def main(perimeter_algorithm='alpha_shape', output_suffix=''):
     print(f"COMPLETE DETECTION VISUALIZATION - {perimeter_algorithm}")
     print("="*80)
 
-    image_path = 'plan_floor2.jpg'
+    image_path = 'plan_floor1.jpg'
 
     # Load model
     print("\n[1/5] Loading model...")
@@ -477,46 +477,49 @@ def main(perimeter_algorithm='alpha_shape', output_suffix=''):
         # 1. Найти компоненты в маске штриховки
         labeled, num = ndimage.label(wall_mask)
 
-        def is_enclosed_by_walls(bbox, wall_segments, tolerance=50):
-            """Check if bbox has walls nearby on at least 3 sides (relaxed check)"""
+        def is_enclosed_by_walls(bbox, wall_segments, tolerance=30):
+            """Check if bbox is enclosed by a rectangle of wall segments"""
             x, y, w, h = bbox
+            center_x = x + w / 2
+            center_y = y + h / 2
 
-            # Check for any wall segments near each edge of bbox
-            edges = {
-                'left': (x, y + h/2, x, y + h/2),           # Left edge midpoint
-                'right': (x + w, y + h/2, x + w, y + h/2),  # Right edge midpoint
-                'top': (x + w/2, y, x + w/2, y),            # Top edge midpoint
-                'bottom': (x + w/2, y + h, x + w/2, y + h)  # Bottom edge midpoint
-            }
+            # Check for walls on all 4 sides (within tolerance)
+            has_left = False
+            has_right = False
+            has_top = False
+            has_bottom = False
 
-            walls_found = {'left': False, 'right': False, 'top': False, 'bottom': False}
+            for seg in wall_segments:
+                x1, y1 = seg['start']
+                x2, y2 = seg['end']
 
-            for edge_name, (ex, ey, _, _) in edges.items():
-                for seg in wall_segments:
-                    x1, y1 = seg['start']
-                    x2, y2 = seg['end']
+                # Check if segment is vertical (left or right wall)
+                if abs(x2 - x1) < 20:  # Vertical wall
+                    seg_x = (x1 + x2) / 2
+                    seg_y_min = min(y1, y2)
+                    seg_y_max = max(y1, y2)
 
-                    # Distance from edge point to wall segment
-                    dx = x2 - x1
-                    dy = y2 - y1
-                    line_len_sq = dx*dx + dy*dy
+                    # Check if center is between segment's y range
+                    if seg_y_min - tolerance < center_y < seg_y_max + tolerance:
+                        if seg_x < center_x - w/2 - tolerance:  # Left wall
+                            has_left = True
+                        elif seg_x > center_x + w/2 + tolerance:  # Right wall
+                            has_right = True
 
-                    if line_len_sq == 0:
-                        continue
+                # Check if segment is horizontal (top or bottom wall)
+                if abs(y2 - y1) < 20:  # Horizontal wall
+                    seg_y = (y1 + y2) / 2
+                    seg_x_min = min(x1, x2)
+                    seg_x_max = max(x1, x2)
 
-                    t = max(0, min(1, ((ex - x1) * dx + (ey - y1) * dy) / line_len_sq))
-                    proj_x = x1 + t * dx
-                    proj_y = y1 + t * dy
-                    dist = np.sqrt((ex - proj_x)**2 + (ey - proj_y)**2)
+                    # Check if center is between segment's x range
+                    if seg_x_min - tolerance < center_x < seg_x_max + tolerance:
+                        if seg_y < center_y - h/2 - tolerance:  # Top wall
+                            has_top = True
+                        elif seg_y > center_y + h/2 + tolerance:  # Bottom wall
+                            has_bottom = True
 
-                    if dist < tolerance:
-                        walls_found[edge_name] = True
-                        break
-
-            # Require at least 3 sides to have walls (relaxed from 4)
-            walls_count = sum(walls_found.values())
-            print(f"        Walls found: {walls_found} (count={walls_count})")
-            return walls_count >= 3
+            return has_left and has_right and has_top and has_bottom
 
         pillars = []
         debug_img = None
@@ -1489,7 +1492,7 @@ def main(perimeter_algorithm='alpha_shape', output_suffix=''):
     plt.tight_layout(pad=0.05, h_pad=0.05, w_pad=0.05)
 
     # Save with reduced DPI to avoid exceeding max size
-    output_path = f'plan_floor2_COMPLETE_analysis{output_suffix}.png'
+    output_path = f'plan_floor1_COMPLETE_analysis{output_suffix}.png'
     plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
     print(f"\n✓ Saved: {output_path}")
 

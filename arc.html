@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MVP крутилки дома</title>
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }
+  #renderCanvas { width:100%; height:100%; touch-action:none; }
+</style>
+</head>
+<body>
+<canvas id="renderCanvas"></canvas>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.min.js"></script>
+<script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+
+<script>
+const canvas = document.getElementById("renderCanvas");
+const engine = new BABYLON.Engine(canvas, true);
+const scene = new BABYLON.Scene(engine);
+
+// CAMERA
+const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/3, 150, new BABYLON.Vector3(0,30,0), scene);
+camera.attachControl(canvas, true);
+camera.lowerRadiusLimit = 10;
+camera.upperRadiusLimit = 500;
+
+// LIGHT
+const light = new BABYLON.HemisphericLight("h", new BABYLON.Vector3(0,1,0), scene);
+light.intensity = 0.9;
+
+// GLOBAL VARIABLE FOR MODEL
+let modelRoot = null;
+
+// LOAD MODEL
+BABYLON.SceneLoader.ImportMesh("", "./", "historic.glb", scene, function(meshes){
+    modelRoot = meshes[0];
+    
+    // Центрируем модель
+    const bbox = modelRoot.getBoundingInfo().boundingBox;
+    const center = bbox.centerWorld;
+    modelRoot.position.subtractInPlace(center);
+
+    // Масштаб по умолчанию
+    modelRoot.scaling = new BABYLON.Vector3(5,5,5);
+
+    // Подбираем радиус камеры
+    const size = bbox.extendSizeWorld.length();
+    camera.radius = size * 3;
+    camera.target = new BABYLON.Vector3(0, bbox.centerWorld.y, 0);
+
+}, null, function(scene, msg, exc){
+    console.error("Ошибка загрузки модели:", msg, exc);
+});
+
+// CAMERA VIEWS
+const views = {
+  north: { alpha: Math.PI/2, beta: Math.PI/3 },
+  east:  { alpha: 0, beta: Math.PI/3 },
+  south: { alpha: -Math.PI/2, beta: Math.PI/3 },
+  west:  { alpha: Math.PI, beta: Math.PI/3 },
+};
+
+// GUI
+const advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+const panel = new BABYLON.GUI.StackPanel();
+panel.width = "220px";
+panel.top = "20px";
+panel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+panel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+advancedTexture.addControl(panel);
+
+// SIDE BUTTONS N/E/S/W
+["north","east","south","west"].forEach(dir=>{
+    const btn = BABYLON.GUI.Button.CreateSimpleButton(dir+"Btn", dir.toUpperCase());
+    btn.height = "40px"; btn.width = "200px";
+    btn.color="white"; btn.background="#4CAF50"; btn.marginTop="5px";
+    btn.onPointerUpObservable.add(()=>goToView(dir));
+    panel.addControl(btn);
+});
+
+// SCALE BUTTONS + / -
+const plusBtn = BABYLON.GUI.Button.CreateSimpleButton("plusBtn","+");
+plusBtn.height="40px"; plusBtn.width="200px"; plusBtn.color="white"; plusBtn.background="#2196F3"; plusBtn.marginTop="20px";
+plusBtn.onPointerUpObservable.add(()=>{ if(modelRoot) modelRoot.scaling.scaleInPlace(1.1); });
+panel.addControl(plusBtn);
+
+const minusBtn = BABYLON.GUI.Button.CreateSimpleButton("minusBtn","-");
+minusBtn.height="40px"; minusBtn.width="200px"; minusBtn.color="white"; minusBtn.background="#f44336"; minusBtn.marginTop="5px";
+minusBtn.onPointerUpObservable.add(()=>{ if(modelRoot) modelRoot.scaling.scaleInPlace(0.9); });
+panel.addControl(minusBtn);
+
+// CAMERA ANIMATION
+function animateCameraTo(alpha, beta, durationMs=1200){
+    const frames = Math.round((durationMs/1000)*60);
+    const easing = new BABYLON.CubicEase();
+    easing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+
+    const alphaAnim = new BABYLON.Animation("alphaAnim","alpha",60,BABYLON.Animation.ANIMATIONTYPE_FLOAT,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+    alphaAnim.setKeys([{frame:0,value:camera.alpha},{frame:frames,value:alpha}]);
+    alphaAnim.setEasingFunction(easing);
+
+    const betaAnim = new BABYLON.Animation("betaAnim","beta",60,BABYLON.Animation.ANIMATIONTYPE_FLOAT,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+    betaAnim.setKeys([{frame:0,value:camera.beta},{frame:frames,value:beta}]);
+    betaAnim.setEasingFunction(easing);
+
+    camera.animations = [alphaAnim, betaAnim];
+    scene.beginAnimation(camera,0,frames,false);
+}
+
+function goToView(dir){
+    const v = views[dir];
+    if(!v) return;
+    animateCameraTo(v.alpha, v.beta);
+}
+
+// MOBILE OPTIMIZATION
+engine.setHardwareScalingLevel(window.innerWidth<800?2:1);
+
+// RENDER LOOP
+engine.runRenderLoop(()=>scene.render());
+window.addEventListener('resize',()=>engine.resize());
+</script>
+</body>
+</html>
