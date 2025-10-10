@@ -214,7 +214,11 @@ def detect_hatching(image, kernel_size=25, density_threshold=0.2):
 
 def extract_wall_segments(wall_mask, min_length=50):
     """Extract wall line segments"""
-    skeleton = cv2.ximgproc.thinning(wall_mask)
+    # Alternative thinning without ximgproc
+    from scipy.ndimage import binary_erosion
+    skeleton = wall_mask.copy()
+    for _ in range(3):
+        skeleton = binary_erosion(skeleton).astype(np.uint8) * 255
     contours, _ = cv2.findContours(skeleton, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     segments = []
