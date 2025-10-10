@@ -54,7 +54,7 @@ MIN_AREA = 1200  # Минимальная площадь области (None = 
 MAX_AREA = None  # Максимальная площадь области (None = отключено)
 MIN_RECTANGULARITY = None  # Минимальное соотношение сторон для прямоугольности (None = отключено)
 MIN_NEIGHBORS = None  # Минимальное количество соседей для связности (None = отключено)
-ADD_LINES = True  # Добавлять горизонтальные и вертикальные линии (True/False)
+ADD_LINES = False  # Добавлять горизонтальные и вертикальные линии (True/False)
 MIN_LINE_LENGTH = 10  # Минимальная длина линии для добавления
 MIN_LINE_OVERLAP_RATIO = 0.3  # Минимальное отношение пересечения линии с штриховкой
 OUTPUT_FILENAME = 'enhanced_hatching_strict_mask.png'  # Имя выходного файла
@@ -134,56 +134,66 @@ def is_rectangular_shape(contour, min_ratio=0.6):
 
 def filter_noise_regions_optimized(mask, min_area=100, max_area=50000, min_rectangularity=0.6, min_neighbors=0):
     """Оптимизированная фильтрация шумовых регионов с более мягкими условиями"""
-    
+
     # Находим все компоненты
     labeled, num = ndimage.label(mask)
-    
-    # Собираем информацию о компонентах
+
+    # Собираем информацию о компонентах с их bounding boxes
     component_info = []
     for i in range(1, num + 1):
         component_mask = (labeled == i).astype(np.uint8) * 255
-        
+
         # Проверяем площадь
         area = np.sum(component_mask > 0)
         if area < min_area or (max_area is not None and area > max_area):
             continue
-        
+
         # Если фильтр по прямоугольности отключен (0), пропускаем все компоненты
         if min_rectangularity > 0:
             # Находим контуры
             contours, _ = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
+
             if not contours:
                 continue
-            
+
             # Проверяем прямоугольность (с более мягким условием)
             is_rectangular = any(is_rectangular_shape(contour, min_rectangularity) for contour in contours)
             if not is_rectangular:
                 continue
-        
-        component_info.append((i, component_mask))
-    
+
+        # Сохраняем компонент с его центром масс для проверки изолированности
+        y_coords, x_coords = np.where(component_mask > 0)
+        centroid_x = np.mean(x_coords)
+        centroid_y = np.mean(y_coords)
+
+        component_info.append((i, component_mask, centroid_x, centroid_y, area))
+
     # Проверяем связность с соседями (только если явно указано)
     if min_neighbors > 0 and len(component_info) > 1:
         final_components = []
-        
-        for i, (comp_id, component_mask) in enumerate(component_info):
+
+        for i, info in enumerate(component_info):
+            comp_id, component_mask = info[0], info[1]
             # Упрощенная проверка связности
             is_connected = False
-            for j, (other_id, other_mask) in enumerate(component_info):
+            for j, other_info in enumerate(component_info):
                 if i == j:
                     continue
-                
+
+                other_id, other_mask = other_info[0], other_info[1]
                 # Проверяем расстояние между компонентами
                 if check_components_proximity(component_mask, other_mask, max_distance=30):
                     is_connected = True
                     break
-            
+
             # Если компонент связан или требование связности не строгое
             if is_connected or min_neighbors <= 1:
                 final_components.append((comp_id, component_mask))
-        
-        component_info = final_components
+
+        component_info = [(info[0], info[1]) for info in final_components]
+    else:
+        # Преобразуем обратно к формату (id, mask)
+        component_info = [(info[0], info[1]) for info in component_info]
     
     # Создаем финальную маску
     filtered_mask = np.zeros_like(mask)
