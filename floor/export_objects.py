@@ -361,6 +361,199 @@ def extract_wall_polygons(wall_mask, min_vertices=4, epsilon_factor=2.0):
 
     return polygons
 
+def point_to_line_segment_distance(point, line_p1, line_p2):
+    """Расстояние от точки до отрезка"""
+    # Длина отрезка
+    line_len = np.linalg.norm(line_p2 - line_p1)
+    if line_len == 0:
+        return np.linalg.norm(point - line_p1)
+    
+    # Проекция точки на линию
+    t = max(0, min(1, np.dot(point - line_p1, line_p2 - line_p1) / (line_len ** 2)))
+    projection = line_p1 + t * (line_p2 - line_p1)
+    
+    return np.linalg.norm(point - projection)
+
+def calculate_polygon_distance(poly1_vertices, poly2_vertices):
+    """
+    Вычисление минимального расстояния между границами двух полигонов
+    
+    Args:
+        poly1_vertices: Вершины первого полигона
+        poly2_vertices: Вершины второго полигона
+        
+    Returns:
+        min_distance: Минимальное расстояние между границами полигонов
+    """
+    # Конвертируем вершины в numpy arrays
+    points1 = np.array([[v['x'], v['y']] for v in poly1_vertices], dtype=np.float32)
+    points2 = np.array([[v['x'], v['y']] for v in poly2_vertices], dtype=np.float32)
+    
+    # Для каждой точки первого полигона находим минимальное расстояние до второго
+    min_distance = float('inf')
+    
+    for point in points1:
+        # Вычисляем расстояние от точки до каждого отрезка второго полигона
+        for i in range(len(points2)):
+            p1 = points2[i]
+            p2 = points2[(i + 1) % len(points2)]  # Замыкаем полигон
+            
+            # Расстояние от точки до отрезка
+            dist = point_to_line_segment_distance(point, p1, p2)
+            min_distance = min(min_distance, dist)
+    
+    return min_distance
+
+def analyze_polygon_connectivity(polygons, proximity_threshold=15):
+    """
+    Анализ связности полигонов на основе близости их границ
+    
+    Args:
+        polygons: Список полигонов с вершинами
+        proximity_threshold: Максимальное расстояние для считывания связанными
+    
+    Returns:
+        adjacency_matrix: Матрица смежности полигонов
+        components: Списки индексов полигонов в каждом компоненте связности
+    """
+    n = len(polygons)
+    adjacency_matrix = np.zeros((n, n), dtype=bool)
+    
+    # Строим матрицу смежности
+    for i in range(n):
+        for j in range(i + 1, n):
+            distance = calculate_polygon_distance(
+                polygons[i]['vertices'],
+                polygons[j]['vertices']
+            )
+            
+            if distance <= proximity_threshold:
+                adjacency_matrix[i][j] = True
+                adjacency_matrix[j][i] = True
+    
+    # Находим компоненты связности с помощью DFS
+    visited = [False] * n
+    components = []
+    
+    def dfs(node, component):
+        visited[node] = True
+        component.append(node)
+        
+        for neighbor in range(n):
+            if adjacency_matrix[node][neighbor] and not visited[neighbor]:
+                dfs(neighbor, component)
+    
+    for i in range(n):
+        if not visited[i]:
+            component = []
+            dfs(i, component)
+            components.append(component)
+    
+    return adjacency_matrix, components
+
+def classify_polygons(polygons, components):
+    """
+    Классификация полигонов на стены и колонны
+    
+    Args:
+        polygons: Список полигонов
+        components: Компоненты связности
+    
+    Returns:
+        wall_polygons: Список полигонов стен
+        pillar_polygons: Список полигонов колонн
+    """
+    if not components:
+        return [], []
+    
+    # Находим компонент с наибольшей общей площадью (основной контур стен)
+    # Это более надежный критерий, чем количество полигонов
+    component_areas = []
+    for component in components:
+        total_area = sum(polygons[i]['area'] for i in component)
+        component_areas.append(total_area)
+    
+    main_component_idx = max(range(len(components)), key=lambda i: component_areas[i])
+    main_component = set(components[main_component_idx])
+    
+    wall_polygons = []
+    pillar_polygons = []
+    
+    for i, polygon in enumerate(polygons):
+        # Добавляем тип полигона
+        polygon_with_type = polygon.copy()
+        
+        if i in main_component:
+            polygon_with_type['type'] = 'wall'
+            wall_polygons.append(polygon_with_type)
+        else:
+            polygon_with_type['type'] = 'pillar'
+            pillar_polygons.append(polygon_with_type)
+    
+    # Выводим информацию о компонентах для отладки
+    print(f"   Компоненты связности (по площади): {component_areas}")
+    print(f"   Основной контур стен: компонент {main_component_idx} (площадь={component_areas[main_component_idx]:.1f})")
+    print(f"   Найдено {len(wall_polygons)} полигонов стен, {len(pillar_polygons)} полигонов колонн")
+    
+    return wall_polygons, pillar_polygons
+
+def extract_wall_polygons_with_classification(wall_mask, min_vertices=4, epsilon_factor=2.0, proximity_threshold=15):
+    """
+    Извлечение полигонов стен с автоматической классификацией на стены и колонны
+    
+    Args:
+        wall_mask: Бинарная маска обнаруженных стен
+        min_vertices: Минимальное количество вершин для валидного полигона
+        epsilon_factor: Допуск аппроксимации для упрощения полигона
+        proximity_threshold: Порог близости для определения связности
+    
+    Returns:
+        wall_polygons: Список полигонов стен
+        pillar_polygons: Список полигонов колонн
+    """
+    # Находим контуры (используем RETR_LIST для получения всех сегментов)
+    contours, _ = cv2.findContours(wall_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # Извлекаем все полигоны
+    all_polygons = []
+    for i, contour in enumerate(contours, 1):
+        area = cv2.contourArea(contour)
+        
+        if area < 100:  # Пропускаем очень маленькие контуры (шум)
+            continue
+        
+        # Упрощаем контур до полигона
+        epsilon = epsilon_factor
+        approx = cv2.approxPolyDP(contour, epsilon, True)
+        
+        if len(approx) >= min_vertices:
+            vertices = [{"x": float(p[0][0]), "y": float(p[0][1])} for p in approx]
+            perimeter = cv2.arcLength(contour, True)
+            
+            polygon_data = {
+                "id": f"wall_polygon_{i}",
+                "vertices": vertices,
+                "area": float(area),
+                "perimeter": float(perimeter),
+                "num_vertices": len(vertices),
+                "source": "hatching"
+            }
+            
+            all_polygons.append(polygon_data)
+    
+    # Анализируем связность и классифицируем полигоны
+    if len(all_polygons) > 1:
+        _, components = analyze_polygon_connectivity(all_polygons, proximity_threshold)
+        wall_polygons, pillar_polygons = classify_polygons(all_polygons, components)
+    else:
+        # Если только один полигон, это стена
+        wall_polygons = all_polygons
+        if wall_polygons:
+            wall_polygons[0]['type'] = 'wall'
+        pillar_polygons = []
+    
+    return wall_polygons, pillar_polygons
+
 def categorize_junctions(junctions_dict):
     """Collect all junctions without categorization"""
     all_junctions = []
@@ -461,155 +654,14 @@ def find_wall_for_opening(opening, wall_segments):
     return best_wall
 
 def detect_pillars_for_export(image, wall_mask, wall_segments, min_area=100, max_area=60000):
-    """Detect pillars with wall hatching texture (standalone only)"""
-    # Find components in hatching mask
-    labeled, num = ndimage.label(wall_mask)
-    
-    def is_enclosed_by_walls(bbox, wall_segments, tolerance=30):
-        """Check if bbox is enclosed by a rectangle of wall segments"""
-        x, y, w, h = bbox
-        center_x = x + w / 2
-        center_y = y + h / 2
-
-        # Check for walls on all 4 sides (within tolerance)
-        has_left = False
-        has_right = False
-        has_top = False
-        has_bottom = False
-
-        for seg in wall_segments:
-            x1, y1 = seg['start']
-            x2, y2 = seg['end']
-
-            # Check if segment is vertical (left or right wall)
-            if abs(x2 - x1) < 20:  # Vertical wall
-                seg_x = (x1 + x2) / 2
-                seg_y_min = min(y1, y2)
-                seg_y_max = max(y1, y2)
-
-                # Check if center is between segment's y range
-                if seg_y_min - tolerance < center_y < seg_y_max + tolerance:
-                    if seg_x < center_x - w/2 - tolerance:  # Left wall
-                        has_left = True
-                    elif seg_x > center_x + w/2 + tolerance:  # Right wall
-                        has_right = True
-
-            # Check if segment is horizontal (top or bottom wall)
-            if abs(y2 - y1) < 20:  # Horizontal wall
-                seg_y = (y1 + y2) / 2
-                seg_x_min = min(x1, x2)
-                seg_x_max = max(x1, x2)
-
-                # Check if center is between segment's x range
-                if seg_x_min - tolerance < center_x < seg_x_max + tolerance:
-                    if seg_y < center_y - h/2 - tolerance:  # Top wall
-                        has_top = True
-                    elif seg_y > center_y + h/2 + tolerance:  # Bottom wall
-                        has_bottom = True
-
-        return has_left and has_right and has_top and has_bottom
-
-    pillars = []
-    
-    # Process all components with shape and size filtering
-    for i in range(1, num + 1):
-        comp = (labeled == i)
-        area = comp.sum()
-
-        if min_area < area < max_area:  # Size filter
-            # Get bounding box
-            y_coords, x_coords = np.where(comp)
-            y_min, y_max = y_coords.min(), y_coords.max()
-            x_min, x_max = x_coords.min(), x_coords.max()
-            w = x_max - x_min + 1
-            h = y_max - y_min + 1
-            aspect = max(w, h) / max(min(w, h), 1)
-
-            # Check if pillar is enclosed by walls (standalone pillars only)
-            bbox = (x_min, y_min, w, h)
-            if is_enclosed_by_walls(bbox, wall_segments, tolerance=50):
-                print(f"      Component at ({x_min},{y_min},{w}x{h}): REJECTED - enclosed by wall rectangle")
-                continue
-            
-            # Adaptive shape filtering based on size
-            if area < 500:  # Small components
-                max_aspect = 10.0
-                min_aspect = 0.2
-            elif area < 2000:  # Medium components
-                max_aspect = 6.0
-                min_aspect = 0.25
-            else:  # Large components
-                max_aspect = 4.0
-                min_aspect = 0.3
-            
-            # Exclude too elongated components
-            if aspect > max_aspect:
-                print(f"      Component at ({x_min},{y_min},{w}x{h}): REJECTED - aspect ratio too high ({aspect:.1f} > {max_aspect})")
-                continue
-            
-            # Check for square-like shape (typical for pillars)
-            if aspect < min_aspect:
-                print(f"      Component at ({x_min},{y_min},{w}x{h}): REJECTED - unusual shape (aspect={aspect:.1f} < {min_aspect})")
-                continue
-            
-            # Check for diagonal texture
-            crop = wall_mask[y_min:y_max+1, x_min:x_max+1]
-            
-            def has_diagonal_texture(crop_img, angles=[45, -45, 135, -135], min_ratio=0.15):
-                """Check if component has diagonal hatching texture"""
-                total_pixels = crop_img.sum() / 255
-                if total_pixels == 0:
-                    return False
-                
-                # Adaptive thresholds based on component size
-                if area < 500:
-                    min_fill_ratio, max_fill_ratio = 0.2, 0.95
-                    min_texture_ratio = 0.08
-                elif area < 2000:
-                    min_fill_ratio, max_fill_ratio = 0.15, 0.9
-                    min_texture_ratio = 0.12
-                else:
-                    min_fill_ratio, max_fill_ratio = 0.1, 0.8
-                    min_texture_ratio = 0.15
-                
-                # Check fill ratio
-                fill_ratio = total_pixels / (w * h)
-                if fill_ratio < min_fill_ratio or fill_ratio > max_fill_ratio:
-                    return False
-                
-                # Check for diagonal lines
-                for angle in angles:
-                    kernel = np.zeros((11, 11), dtype=np.uint8)
-                    center = 5
-                    angle_rad = np.deg2rad(angle)
-                    for i in range(11):
-                        offset = i - center
-                        x = int(center + offset * np.cos(angle_rad))
-                        y = int(center + offset * np.sin(angle_rad))
-                        if 0 <= x < 11 and 0 <= y < 11:
-                            kernel[y, x] = 1
-                    
-                    detected = cv2.morphologyEx(crop_img, cv2.MORPH_OPEN, kernel, iterations=1)
-                    detected_pixels = detected.sum() / 255
-                    
-                    ratio = detected_pixels / total_pixels if total_pixels > 0 else 0
-                    if detected_pixels >= min_texture_ratio * total_pixels:
-                        return True
-                
-                return False
-            
-            has_texture = has_diagonal_texture(crop)
-            if has_texture:
-                pillars.append({
-                    'x': x_min,
-                    'y': y_min,
-                    'width': w,
-                    'height': h,
-                    'area': area,
-                    'aspect_ratio': aspect
-                })
-    
-    return pillars
+    """
+    Detect pillars with wall hatching texture (standalone only)
+    МОДИФИЦИРОВАННАЯ ВЕРСИЯ: теперь использует только изолированные полигоны
+    """
+    # В новой версии эта функция просто возвращает пустой список,
+    # так как колонны определяются через extract_wall_polygons_with_classification
+    print("   Примечание: колонны теперь определяются как изолированные полигоны")
+    return []
 
 def extract_rooms_from_walls(wall_segments):
     """Extract room polygons from wall segments"""
@@ -748,7 +800,7 @@ def estimate_wall_thickness(wall_segments):
     
     return 10  # Default thickness
 
-def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars, rooms, scale_factor):
+def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars, rooms, pillar_polygons, scale_factor):
     """Create colored SVG file with all detected objects"""
     height, width = image_shape[:2]
     
@@ -765,6 +817,7 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
         'window': '#00CED1',          # Dark turquoise for windows
         'door': '#228B22',            # Forest green for doors
         'pillar': '#FF6347',          # Tomato red for pillars
+        'pillar_polygon': '#FFD700',  # Gold for pillar polygons
         'room': '#F0F8FF',            # Alice blue (light) for rooms
         'room_border': '#708090'      # Slate gray for room borders
     }
@@ -863,6 +916,32 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
             font_weight='bold'
         ))
     
+    # Draw pillar polygons
+    if pillar_polygons:
+        pillar_polygon_group = dwg.add(dwg.g(id='pillar_polygons'))
+        for polygon in pillar_polygons:
+            points = [(float(v['x'] * scale_factor), float(v['y'] * scale_factor)) for v in polygon['vertices']]
+            if len(points) >= 3:
+                pillar_polygon_group.add(dwg.polygon(
+                    points,
+                    fill=colors['pillar_polygon'],
+                    stroke='darkred',
+                    stroke_width=int(2 * scale_factor),
+                    opacity=0.7
+                ))
+                # Add label
+                if points:
+                    center_x = sum(p[0] for p in points) / len(points)
+                    center_y = sum(p[1] for p in points) / len(points)
+                    pillar_polygon_group.add(dwg.text(
+                        'P',
+                        insert=(center_x, center_y),
+                        text_anchor='middle',
+                        fill='black',
+                        font_size=int(12 * scale_factor),
+                        font_weight='bold'
+                    ))
+    
     # Add legend
     legend_group = dwg.add(dwg.g(id='legend', font_size=int(14 * scale_factor)))
     legend_x = int(20 * scale_factor)
@@ -875,6 +954,7 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
         ('Windows', colors['window']),
         ('Doors', colors['door']),
         ('Pillars', colors['pillar']),
+        ('Pillar Polygons', colors['pillar_polygon']),
         ('Rooms', colors['room'])
     ]
     
@@ -917,6 +997,7 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
         f"Windows: {len(windows)}",
         f"Doors: {len(doors)}",
         f"Pillars: {len(pillars)}",
+        f"Pillar Polygons: {len(pillar_polygons)}",
         f"Rooms: {len(rooms)}"
     ]
     
@@ -1038,8 +1119,8 @@ def main():
             print(f"   Error loading reference mask: {e}")
             wall_mask_polygons = np.zeros_like(wall_mask_hatching)
 
-        wall_polygons_hatching = extract_wall_polygons(wall_mask_polygons)
-        print(f"   Extracted {len(wall_polygons_hatching)} wall polygons from hatching")
+        wall_polygons_hatching, pillar_polygons_hatching = extract_wall_polygons_with_classification(wall_mask_polygons)
+        print(f"   Extracted {len(wall_polygons_hatching)} wall polygons and {len(pillar_polygons_hatching)} pillar polygons from hatching")
 
         rooms_logits = prediction[0, 21:33]
         rooms_pred = torch.argmax(rooms_logits, 0).cpu().data.numpy()
@@ -1194,7 +1275,7 @@ def main():
         wall_mask = detect_hatching_enhanced_fixed(img_np, min_area=50, max_area=60000)
         pillars = detect_pillars_for_export(img_np, wall_mask, wall_segments, min_area=50, max_area=60000)
         
-        print(f"   Detected: {len(pillars)} pillars, {len(all_junctions)} junctions")
+        print(f"   Detected: {len(pillars)} traditional pillars, {len(pillar_polygons_hatching)} polygon pillars, {len(all_junctions)} junctions")
     except Exception as e:
         print(f"   Error processing openings: {e}")
         return
@@ -1225,6 +1306,7 @@ def main():
             },
             "walls": [],
             "wall_polygons": [],
+            "pillar_polygons": [],  # Новое поле для полигонов колонн
             "openings": [],
             "pillars": [],
             "rooms": [],
@@ -1234,6 +1316,7 @@ def main():
                 "windows": 0,
                 "doors": 0,
                 "pillars": 0,
+                "pillar_polygons": 0,  # Новое поле в статистике
                 "rooms": 0,
                 "junctions": 0
             }
@@ -1254,6 +1337,10 @@ def main():
         # Export wall polygons
         for polygon in wall_polygons_hatching:
             json_data["wall_polygons"].append(polygon)
+
+        # Export pillar polygons
+        for polygon in pillar_polygons_hatching:
+            json_data["pillar_polygons"].append(polygon)
 
         # Export windows
         for i, window in enumerate(windows):
@@ -1304,10 +1391,36 @@ def main():
             
             json_data["openings"].append(door_data)
 
-        # Export pillars
-        for i, pillar in enumerate(pillars):
+        # Export pillars from polygons (если они есть)
+        for i, polygon in enumerate(pillar_polygons_hatching):
+            # Вычисляем bounding box для полигона
+            vertices = polygon['vertices']
+            x_coords = [v['x'] for v in vertices]
+            y_coords = [v['y'] for v in vertices]
+            
             pillar_data = {
                 "id": f"pillar_{i+1}",
+                "type": "pillar_polygon",
+                "bbox": {
+                    "x": float(min(x_coords)),
+                    "y": float(min(y_coords)),
+                    "width": float(max(x_coords) - min(x_coords)),
+                    "height": float(max(y_coords) - min(y_coords))
+                },
+                "vertices": vertices,  # Сохраняем и вершины
+                "height": 3.0,
+                "area": float(polygon['area']),
+                "perimeter": float(polygon['perimeter']),
+                "num_vertices": polygon['num_vertices'],
+                "source": polygon['source']
+            }
+            json_data["pillars"].append(pillar_data)
+
+        # Export traditional pillars (если они есть)
+        for i, pillar in enumerate(pillars):
+            pillar_data = {
+                "id": f"pillar_{i+len(pillar_polygons_hatching)+1}",
+                "type": "traditional_pillar",
                 "bbox": {
                     "x": float(pillar['x']),
                     "y": float(pillar['y']),
@@ -1339,6 +1452,7 @@ def main():
         json_data["statistics"]["windows"] = len([o for o in json_data["openings"] if o["type"] == "window"])
         json_data["statistics"]["doors"] = len([o for o in json_data["openings"] if o["type"] == "door"])
         json_data["statistics"]["pillars"] = len(json_data["pillars"])
+        json_data["statistics"]["pillar_polygons"] = len(json_data["pillar_polygons"])
         json_data["statistics"]["rooms"] = len(json_data["rooms"])
         json_data["statistics"]["junctions"] = len(json_data["junctions"])
 
@@ -1360,6 +1474,7 @@ def main():
                 windows,
                 pillars,
                 rooms,
+                pillar_polygons_hatching,  # Новый параметр
                 scale
             )
             print(f"   SVG saved to: {svg_output_path} ({svg_w}x{svg_h})")
@@ -1378,6 +1493,7 @@ def main():
     print(f"  Windows: {len([o for o in json_data['openings'] if o['type'] == 'window'])}")
     print(f"  Doors:   {len([o for o in json_data['openings'] if o['type'] == 'door'])}")
     print(f"  Pillars: {len(json_data['pillars'])}")
+    print(f"  Pillar polygons: {len(json_data['pillar_polygons'])}")
     print(f"  Rooms:   {len(json_data['rooms'])}")
     print(f"\nOutput:")
     print(f"  JSON: {output_path}")
