@@ -9,7 +9,16 @@ from scipy import ndimage
 from scipy.ndimage import binary_erosion
 from PIL import Image, ImageEnhance
 import time
-from line_detection import enhance_lines_with_hatching
+# from line_detection import enhance_lines_with_hatching  # Закомментировано, так как модуль отсутствует
+
+# Заглушка для отсутствующей функции
+def enhance_lines_with_hatching(wall_mask, gray, min_line_length, min_line_overlap_ratio):
+    """
+    Заглушка для отсутствующей функции enhance_lines_with_hatching
+    Возвращает исходную маску без изменений
+    """
+    print("   Внимание: используется заглушка для enhance_lines_with_hatching")
+    return wall_mask, 0, 0
 
 # =============================================================================
 # ПАРАМЕТРЫ ДЛЯ НАСТРОЙКИ ЖЕСТКОСТИ МАСКИ ШТРИХОВКИ

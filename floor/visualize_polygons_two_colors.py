@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Визуализация полигонов стен, окон и дверей с разными цветами:
-- Красный для стен контура дома
-- Желтый для двух маленьких колонн (polygon_1 и polygon_2) с полной заливкой
+- Красный контур для стен (определенный по растру изображения)
+- Коричневый для колонн с полной заливкой
 - Синий для окон
 - Зеленый для дверей
 """
@@ -11,6 +11,23 @@ import json
 import cv2
 import numpy as np
 from PIL import Image
+
+def detect_contours_from_image(image):
+    """Обнаруживает контуры на изображении с помощью Canny"""
+    # Преобразование в градации серого
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # Размытие для уменьшения шума
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    
+    # Детектор границ Canny
+    edges = cv2.Canny(blurred, 50, 150)
+    
+    # Морфологические операции для улучшения контуров
+    kernel = np.ones((3, 3), np.uint8)
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    
+    return edges
 
 def visualize_polygons_two_colors():
     """Создает визуализацию полигонов стен, окон и дверей с разными цветами"""
@@ -49,10 +66,24 @@ def visualize_polygons_two_colors():
     print(f"Найдено колонн (bbox): {len(pillars)}")
 
     # Определяем цвета (BGR формат для OpenCV)
-    main_wall_color = (0, 0, 255)      # Красный для основных стен контура
-    pillar_color = (0, 255, 255)       # Желтый для маленьких колонн
+    main_wall_color = (0, 0, 255)      # Красный для стен
+    pillar_color = (42, 42, 165)       # Коричневый для колонн
     window_color = (255, 0, 0)         # Синий для окон
     door_color = (0, 255, 0)           # Зеленый для дверей
+
+    # Обнаруживаем контуры на исходном изображении
+    print("\nОбнаружение контуров на изображении...")
+    contours_edges = detect_contours_from_image(img)
+    
+    # Накладываем контуры на изображение
+    contour_overlay = overlay.copy()
+    # Преобразуем контуры в 3-канальное изображение для отображения красным цветом
+    contours_colored = np.zeros_like(contour_overlay)
+    contours_colored[contours_edges > 0] = main_wall_color
+    
+    # Комбинируем контуры с основным изображением
+    mask = contours_edges > 0
+    contour_overlay[mask] = main_wall_color
 
     # Отрисовываем каждый полигон
     for idx, polygon in enumerate(wall_polygons):
@@ -82,18 +113,8 @@ def visualize_polygons_two_colors():
 
         print(f"  Тип: {polygon_type}")
 
-        # Для большого полигона (P10) - только контур, без заливки
-        # Для остальных полигонов (включая колонны P1 и P2) - полная заливка без прозрачности
-        if area > 50000:  # Большой полигон (P10)
-            # Только контур, без заливки
-            cv2.polylines(overlay, [pts], True, color, 5, cv2.LINE_AA)
-        else:
-            # Отрисовываем заполненный полигон без прозрачности (полная заливка)
-            # Теперь колонны P1 и P2 также закрашиваются полностью, как и остальные стены
-            cv2.fillPoly(overlay, [pts], color)
-            
-            # Отрисовываем контур полигона
-            cv2.polylines(overlay, [pts], True, color, 3, cv2.LINE_AA)
+        # Все стены отображаем только контуром, без заливки (убрали дифференцированный подход)
+        cv2.polylines(overlay, [pts], True, color, 3, cv2.LINE_AA)
 
         # Добавляем номер полигона в центре полигона
         M = cv2.moments(pts)
@@ -206,11 +227,11 @@ def visualize_polygons_two_colors():
     door_count = sum(1 for o in openings if o['type'] == 'door')
     
     print(f"\nСтатистика:")
-    print(f"  Основные стены контура: {main_wall_count} (красный цвет)")
-    print(f"  Полигоны колонн: {pillar_polygon_count} (желтый цвет)")  # Новый вывод
+    print(f"  Стены (контур по растру): {main_wall_count} (красный контур)")
+    print(f"  Полигоны колонн: {pillar_polygon_count} (коричневый цвет)")
     print(f"  Колонны (bbox): {len(pillars)} (из старого формата)")
-    print(f"  Окна: {window_count} (синий цвет)")
-    print(f"  Двери: {door_count} (зеленый цвет)")
+    print(f"  Окна: {window_count} (синий контур)")
+    print(f"  Двери: {door_count} (зеленый контур)")
 
 if __name__ == '__main__':
     visualize_polygons_two_colors()

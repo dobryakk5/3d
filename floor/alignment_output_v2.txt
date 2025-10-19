@@ -1,0 +1,43 @@
+Запуск теста выравнивания стен v2...
+============================================================
+ТЕСТИРОВАНИЕ ВЫРАВНИВАНИЯ СТЕН - ВЕРСИЯ 2
+============================================================
+  [ALIGNMENT] Starting wall alignment process
+  [ALIGNMENT] Processing 13 openings and 45 junctions
+  [ALIGNMENT] Grouping 13 openings by wall
+  [ALIGNMENT] Found 7 horizontal and 6 vertical openings
+  [ALIGNMENT] Created horizontal group at y=139.0 with 3 openings
+  [ALIGNMENT] Created horizontal group at y=963.0 with 2 openings
+  [ALIGNMENT] Created vertical group at x=204.0 with 2 openings
+  [ALIGNMENT] Created vertical group at x=1070.0 with 2 openings
+  [ALIGNMENT] Created 4 wall groups
+  [ALIGNMENT] Aligning wall group at 139.0 (horizontal)
+  [ALIGNMENT]   Target Y position: 137.0 (opening door_2)
+  [ALIGNMENT]   Aligned opening window_2: Y 139.0 -> 137.0
+  [ALIGNMENT]   Aligned opening window_4: Y 138.0 -> 137.0
+  [ALIGNMENT]   Aligned opening door_2: Y 137.0 -> 137.0
+  [ALIGNMENT] Aligning wall group at 963.0 (horizontal)
+  [ALIGNMENT]   Target Y position: 963.0 (opening door_1)
+  [ALIGNMENT]   Aligned opening door_1: Y 963.0 -> 963.0
+  [ALIGNMENT]   Aligned opening door_3: Y 965.0 -> 963.0
+  [ALIGNMENT] Aligning wall group at 204.0 (vertical)
+  [ALIGNMENT]   Target X position: 204.0 (opening window_3)
+  [ALIGNMENT]   Aligned opening window_3: X 204.0 -> 204.0
+  [ALIGNMENT]   Aligned opening window_5: X 205.0 -> 204.0
+  [ALIGNMENT] Aligning wall group at 1070.0 (vertical)
+  [ALIGNMENT]   Target X position: 1070.0 (opening window_6)
+  [ALIGNMENT]   Aligned opening window_6: X 1070.0 -> 1070.0
+  [ALIGNMENT]   Aligned opening window_7: X 1070.0 -> 1070.0
+  [ALIGNMENT] Processed 9 openings in 4 wall groups
+  [ALIGNMENT] Left 4 single-opening walls unmodified
+  [ALIGNMENT] Wall alignment completed
+
+Проверка результатов выравнивания:
+  ✓ Горизонтальная стена Y=137.0 выровнена (3 openings)
+  ✓ Горизонтальная стена Y=963.0 выровнена (2 openings)
+  ✓ Вертикальная стена X=204.0 выровнена (2 openings)
+  ✓ Вертикальная стена X=1070.0 выровнена (2 openings)
+
+✓ Выравненные данные сохранены в plan_floor1_objects_aligned_v2.json
+============================================================
+Готово!

@@ -1,0 +1,4 @@
+
+        # Добавляем проем в JSON с измененными координатами
+        if json_data:
+            add_opening_to_json(json_data, {"id": opening_id, "type": opening_type, "bbox": opening_with_junction.bbox}, edge_junctions)

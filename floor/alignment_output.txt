@@ -1,0 +1,72 @@
+Запуск теста выравнивания стен...
+============================================================
+ТЕСТИРОВАНИЕ ВЫРАВНИВАНИЯ СТЕН
+============================================================
+
+Junctions с Y ~ 415:
+  J36: (216.0, 375.0) - unknown_16
+
+Openings с Y ~ 137:
+  window_2: y=139.0, height=28.0
+  window_4: y=138.0, height=24.0
+  door_2: y=137.0, height=27.0
+  [ALIGNMENT] Starting wall alignment process
+  [ALIGNMENT] Processing 13 openings and 45 junctions
+  [ALIGNMENT] Grouping 13 openings by wall
+  [ALIGNMENT] Found 7 horizontal and 6 vertical openings
+  [ALIGNMENT] Created horizontal group at y=139.0 with 3 openings
+  [ALIGNMENT] Created horizontal group at y=963.0 with 2 openings
+  [ALIGNMENT] Created vertical group at x=204.0 with 2 openings
+  [ALIGNMENT] Created vertical group at x=1070.0 with 2 openings
+  [ALIGNMENT] Wall wall_horizontal_0: 3 openings, 2 junctions
+  [ALIGNMENT] Wall wall_horizontal_1: 2 openings, 2 junctions
+  [ALIGNMENT] Wall wall_vertical_0: 2 openings, 2 junctions
+  [ALIGNMENT] Wall wall_vertical_1: 2 openings, 2 junctions
+  [ALIGNMENT] Created 4 wall groups
+  [ALIGNMENT] Aligning wall group wall_horizontal_0 (horizontal)
+  [ALIGNMENT]   Target Y position: 137.0 (opening door_2)
+  [ALIGNMENT]   Aligned opening window_2: Y 139.0 -> 137.0
+  [ALIGNMENT]   Aligned opening window_4: Y 138.0 -> 137.0
+  [ALIGNMENT]   Aligned opening door_2: Y 137.0 -> 137.0
+  [ALIGNMENT] Aligning wall group wall_horizontal_1 (horizontal)
+  [ALIGNMENT]   Target Y position: 963.0 (opening door_1)
+  [ALIGNMENT]   Aligned opening door_1: Y 963.0 -> 963.0
+  [ALIGNMENT]   Aligned opening door_3: Y 965.0 -> 963.0
+  [ALIGNMENT] Aligning wall group wall_vertical_0 (vertical)
+  [ALIGNMENT]   Target X position: 204.0 (opening window_3)
+  [ALIGNMENT]   Aligned opening window_3: X 204.0 -> 204.0
+  [ALIGNMENT]   Aligned opening window_5: X 205.0 -> 204.0
+  [ALIGNMENT] Aligning wall group wall_vertical_1 (vertical)
+  [ALIGNMENT]   Target X position: 1070.0 (opening window_6)
+  [ALIGNMENT]   Aligned opening window_6: X 1070.0 -> 1070.0
+  [ALIGNMENT]   Aligned opening window_7: X 1070.0 -> 1070.0
+  [ALIGNMENT] Processed 9 openings in 4 wall groups
+  [ALIGNMENT] Left 4 single-opening walls unmodified
+  [ALIGNMENT] Wall alignment completed
+
+Проверка результатов выравнивания:
+  ✗ Стена wall_horizontal_0 не выровнена: {137.0, 138.0, 139.0}
+  ✗ Стена wall_horizontal_1 не выровнена: {963.0, 965.0}
+Traceback (most recent call last):
+  File "/Users/pavellebedev/Desktop/3d/floor/test_alignment.py", line 60, in <module>
+    main()
+    ~~~~^^
+  File "/Users/pavellebedev/Desktop/3d/floor/test_alignment.py", line 54, in main
+    json.dump(aligned_data, f, indent=2)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pavellebedev/.pyenv/versions/3.13.3/lib/python3.13/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+                 ^^^^^^^^
+  File "/Users/pavellebedev/.pyenv/versions/3.13.3/lib/python3.13/json/encoder.py", line 432, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/Users/pavellebedev/.pyenv/versions/3.13.3/lib/python3.13/json/encoder.py", line 406, in _iterencode_dict
+    yield from chunks
+  File "/Users/pavellebedev/.pyenv/versions/3.13.3/lib/python3.13/json/encoder.py", line 326, in _iterencode_list
+    yield from chunks
+  File "/Users/pavellebedev/.pyenv/versions/3.13.3/lib/python3.13/json/encoder.py", line 439, in _iterencode
+    o = _default(o)
+  File "/Users/pavellebedev/.pyenv/versions/3.13.3/lib/python3.13/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type WallGroup is not JSON serializable
+Готово!

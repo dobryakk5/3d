@@ -1,0 +1,8 @@
+# Ignore model checkpoints
+output/trained_r2gmodel/checkpoint0299.pth
+
+# Ignore all model checkpoints (optional)
+output/trained_r2gmodel/*.pth
+
+# Ignore all output files (optional)
+output/

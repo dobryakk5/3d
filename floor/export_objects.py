@@ -20,7 +20,60 @@ import sys
 sys.path.append('floortrans')
 from floortrans.models import get_model
 import svgwrite
-from line_detection import enhance_lines_with_hatching
+
+# Заглушка для отсутствующей функции
+def enhance_lines_with_hatching(wall_mask, gray, min_line_length, min_line_overlap_ratio):
+    """
+    Заглушка для отсутствующей функции enhance_lines_with_hatching
+    Возвращает исходную маску без изменений
+    """
+    print("   Внимание: используется заглушка для enhance_lines_with_hatching")
+    return wall_mask, 0, 0
+def detect_walls_from_raster(image_np, scale_factor=1.0):
+    """
+    Определяет прямые стены на архитектурном плане с помощью Hough Transform.
+    Возвращает список стен в формате JSON.
+    """
+    # Настройки
+    WALL_THICKNESS = 0.2
+    WALL_HEIGHT = 3.0
+
+    # === 1. Предобработка ===
+    # Преобразуем RGB в градации серого, если необходимо
+    if len(image_np.shape) == 3:
+        gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = image_np
+    
+    # Убираем шум и усиливаем контраст
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+
+    # === 2. Поиск прямых ===
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=120,
+        minLineLength=80,
+        maxLineGap=10
+    )
+
+    walls = []
+    if lines is not None:
+        for i, line in enumerate(lines, start=1):
+            x1, y1, x2, y2 = line[0]
+            walls.append({
+                "id": f"wall_{i}",
+                "start": {"x": float(x1 * scale_factor), "y": float(y1 * scale_factor)},
+                "end": {"x": float(x2 * scale_factor), "y": float(y2 * scale_factor)},
+                "thickness": WALL_THICKNESS,
+                "height": WALL_HEIGHT,
+                "source": "HoughTransform"
+            })
+
+    return walls
+
 
 # Import detection functions from existing scripts
 exec(open('cubicasa_vectorize.py').read().split('if __name__')[0])
@@ -404,6 +457,63 @@ def calculate_polygon_distance(poly1_vertices, poly2_vertices):
     
     return min_distance
 
+def is_polygon_near_openings(polygon_vertices, doors, windows, proximity_threshold=20):
+    """
+    Проверка, находится ли полигон рядом с дверями или окнами
+    
+    Args:
+        polygon_vertices: Вершины полигона
+        doors: Список обнаруженных дверей
+        windows: Список обнаруженных окон
+        proximity_threshold: Максимальное расстояние для считывания "рядом"
+    
+    Returns:
+        bool: True, если полигон находится рядом с дверью или окном
+    """
+    # Конвертируем вершины в numpy array
+    points = np.array([[v['x'], v['y']] for v in polygon_vertices], dtype=np.float32)
+    
+    # Объединяем двери и окна
+    all_openings = doors + windows
+    
+    for opening in all_openings:
+        x, y, w, h = opening['bbox']
+        
+        # Проверяем расстояние от каждой вершины полигона до границ проема
+        for point in points:
+            px, py = point
+            
+            # Расстояние до каждой из четырех сторон прямоугольника проема
+            # Левая сторона
+            if abs(px - x) <= proximity_threshold and y <= py <= y + h:
+                return True
+            
+            # Правая сторона
+            if abs(px - (x + w)) <= proximity_threshold and y <= py <= y + h:
+                return True
+            
+            # Верхняя сторона
+            if abs(py - y) <= proximity_threshold and x <= px <= x + w:
+                return True
+            
+            # Нижняя сторона
+            if abs(py - (y + h)) <= proximity_threshold and x <= px <= x + w:
+                return True
+            
+            # Расстояние до углов (для полигонов, которые могут быть рядом с углами проемов)
+            corners = [
+                (x, y),           # верхний левый
+                (x + w, y),       # верхний правый
+                (x, y + h),       # нижний левый
+                (x + w, y + h)    # нижний правый
+            ]
+            
+            for cx, cy in corners:
+                if np.sqrt((px - cx)**2 + (py - cy)**2) <= proximity_threshold:
+                    return True
+    
+    return False
+
 def analyze_polygon_connectivity(polygons, proximity_threshold=15):
     """
     Анализ связности полигонов на основе близости их границ
@@ -451,13 +561,15 @@ def analyze_polygon_connectivity(polygons, proximity_threshold=15):
     
     return adjacency_matrix, components
 
-def classify_polygons(polygons, components):
+def classify_polygons(polygons, components, doors=None, windows=None):
     """
-    Классификация полигонов на стены и колонны
+    Классификация полигонов на стены и колонны на основе близости к дверям/окнам
     
     Args:
         polygons: Список полигонов
-        components: Компоненты связности
+        components: Компоненты связности (используется как запасной вариант)
+        doors: Список обнаруженных дверей
+        windows: Список обнаруженных окон
     
     Returns:
         wall_polygons: Список полигонов стен
@@ -466,8 +578,57 @@ def classify_polygons(polygons, components):
     if not components:
         return [], []
     
+    # Если двери или окна не предоставлены, используем старый метод
+    if doors is None or windows is None:
+        print("   Двери или окна не предоставлены, используем классификацию по связности")
+        return classify_polygons_by_connectivity(polygons, components)
+    
+    wall_polygons = []
+    pillar_polygons = []
+    
+    # Проверяем каждый полигон на близость к дверям/окнам
+    for i, polygon in enumerate(polygons):
+        polygon_with_type = polygon.copy()
+        
+        # Если полигон рядом с дверью или окном, это стена
+        if is_polygon_near_openings(polygon['vertices'], doors, windows, proximity_threshold=20):
+            polygon_with_type['type'] = 'wall'
+            polygon_with_type['classification_reason'] = 'near_opening'
+            wall_polygons.append(polygon_with_type)
+        else:
+            # В качестве запасного варианта используем классификацию по связности
+            # Находим компонент с наибольшей общей площадью (основной контур стен)
+            component_areas = []
+            for component in components:
+                total_area = sum(polygons[idx]['area'] for idx in component)
+                component_areas.append(total_area)
+            
+            main_component_idx = max(range(len(components)), key=lambda idx: component_areas[idx])
+            main_component = set(components[main_component_idx])
+            
+            if i in main_component:
+                polygon_with_type['type'] = 'wall'
+                polygon_with_type['classification_reason'] = 'main_component'
+                wall_polygons.append(polygon_with_type)
+            else:
+                polygon_with_type['type'] = 'pillar'
+                polygon_with_type['classification_reason'] = 'isolated'
+                pillar_polygons.append(polygon_with_type)
+    
+    # Выводим информацию о классификации для отладки
+    print(f"   Классификация по близости к проемам:")
+    print(f"   Найдено {len(wall_polygons)} полигонов стен, {len(pillar_polygons)} полигонов колонн")
+    
+    return wall_polygons, pillar_polygons
+
+def classify_polygons_by_connectivity(polygons, components):
+    """
+    Запасная функция классификации полигонов на основе связности (оригинальный метод)
+    """
+    if not components:
+        return [], []
+    
     # Находим компонент с наибольшей общей площадью (основной контур стен)
-    # Это более надежный критерий, чем количество полигонов
     component_areas = []
     for component in components:
         total_area = sum(polygons[i]['area'] for i in component)
@@ -485,9 +646,11 @@ def classify_polygons(polygons, components):
         
         if i in main_component:
             polygon_with_type['type'] = 'wall'
+            polygon_with_type['classification_reason'] = 'main_component'
             wall_polygons.append(polygon_with_type)
         else:
             polygon_with_type['type'] = 'pillar'
+            polygon_with_type['classification_reason'] = 'isolated'
             pillar_polygons.append(polygon_with_type)
     
     # Выводим информацию о компонентах для отладки
@@ -497,7 +660,7 @@ def classify_polygons(polygons, components):
     
     return wall_polygons, pillar_polygons
 
-def extract_wall_polygons_with_classification(wall_mask, min_vertices=4, epsilon_factor=2.0, proximity_threshold=15):
+def extract_wall_polygons_with_classification(wall_mask, min_vertices=4, epsilon_factor=2.0, proximity_threshold=15, doors=None, windows=None):
     """
     Извлечение полигонов стен с автоматической классификацией на стены и колонны
     
@@ -506,6 +669,8 @@ def extract_wall_polygons_with_classification(wall_mask, min_vertices=4, epsilon
         min_vertices: Минимальное количество вершин для валидного полигона
         epsilon_factor: Допуск аппроксимации для упрощения полигона
         proximity_threshold: Порог близости для определения связности
+        doors: Список обнаруженных дверей
+        windows: Список обнаруженных окон
     
     Returns:
         wall_polygons: Список полигонов стен
@@ -544,12 +709,13 @@ def extract_wall_polygons_with_classification(wall_mask, min_vertices=4, epsilon
     # Анализируем связность и классифицируем полигоны
     if len(all_polygons) > 1:
         _, components = analyze_polygon_connectivity(all_polygons, proximity_threshold)
-        wall_polygons, pillar_polygons = classify_polygons(all_polygons, components)
+        wall_polygons, pillar_polygons = classify_polygons(all_polygons, components, doors, windows)
     else:
         # Если только один полигон, это стена
         wall_polygons = all_polygons
         if wall_polygons:
             wall_polygons[0]['type'] = 'wall'
+            wall_polygons[0]['classification_reason'] = 'single_polygon'
         pillar_polygons = []
     
     return wall_polygons, pillar_polygons
@@ -1119,7 +1285,8 @@ def main():
             print(f"   Error loading reference mask: {e}")
             wall_mask_polygons = np.zeros_like(wall_mask_hatching)
 
-        wall_polygons_hatching, pillar_polygons_hatching = extract_wall_polygons_with_classification(wall_mask_polygons)
+        wall_polygons_hatching, pillar_polygons_hatching = extract_wall_polygons_with_classification(
+            wall_mask_polygons, doors=doors, windows=windows)
         print(f"   Extracted {len(wall_polygons_hatching)} wall polygons and {len(pillar_polygons_hatching)} pillar polygons from hatching")
 
         rooms_logits = prediction[0, 21:33]
