@@ -8,7 +8,7 @@
     "door_height": 2.1,
     "window_height": 1.5,
     "window_sill_height": 1.0,
-    "timestamp": "2025-10-16T21:48:02.500175",
+    "timestamp": "2025-10-19T19:41:09.155418",
     "model_info": {
       "name": "hg_furukawa_original",
       "weights": "model_best_val_loss_var.pkl"
