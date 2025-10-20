@@ -1247,7 +1247,7 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         # Параметры
         wall_height_meters = wall_height
         scale_factor = 0.01  # 1 пиксель = 0.01 метра
-        invert_x = False  # Отключаем инверсию X-координаты (координаты уже инвертированы в JSON)
+        invert_x = True  # Включаем инверсию X-координаты в коде
         
         # Устанавливаем единицы измерения в метры
         bpy.context.scene.unit_settings.system = 'METRIC'
