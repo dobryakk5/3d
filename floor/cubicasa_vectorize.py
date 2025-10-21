@@ -150,8 +150,8 @@ def is_on_wall(window, wall_segments, max_distance=30):
     ]
 
     for segment in wall_segments:
-        x1, y1 = segment['start']
-        x2, y2 = segment['end']
+        x1, y1 = segment['start']['x'], segment['start']['y']
+        x2, y2 = segment['end']['x'], segment['end']['y']
 
         for px, py in points:
             dist = point_to_line_distance(px, py, x1, y1, x2, y2)
@@ -238,8 +238,8 @@ def extract_wall_segments(wall_mask, min_length=50):
                     length = np.sqrt((pt2[0]-pt1[0])**2 + (pt2[1]-pt1[1])**2)
                     if length >= min_length:
                         segments.append({
-                            'start': pt1,
-                            'end': pt2,
+                            'start': {'x': pt1[0], 'y': pt1[1]},
+                            'end': {'x': pt2[0], 'y': pt2[1]},
                             'length': float(length)
                         })
 
@@ -299,8 +299,8 @@ def create_svg(output_path, image_shape, walls, doors, windows, junctions, scale
     # Draw walls
     wall_group = dwg.add(dwg.g(id='walls', stroke='black', stroke_width=int(6*scale_factor), fill='none'))
     for wall in walls:
-        x1, y1 = wall['start']
-        x2, y2 = wall['end']
+        x1, y1 = wall['start']['x'], wall['start']['y']
+        x2, y2 = wall['end']['x'], wall['end']['y']
         wall_group.add(dwg.line(
             start=(float(x1 * scale_factor), float(y1 * scale_factor)),
             end=(float(x2 * scale_factor), float(y2 * scale_factor)),

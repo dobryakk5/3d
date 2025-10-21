@@ -5,66 +5,92 @@ import os
 from mathutils import Vector, Matrix
 import random
 
-def is_external_wall(segment_data, openings, wall_segments_from_openings, pillars=None):
+def detect_external_walls(wall_segments_from_openings, wall_segments_from_junctions,
+                         openings, pillars=None, boundary_threshold=20.0):
     """
-    Определяет, является ли стена внешней на основе наличия окон и расположения
+    Определяет внешние стены на основе анализа границ здания и наличия окон
     
     Args:
-        segment_data: данные сегмента стены
-        openings: список всех проемов
         wall_segments_from_openings: список сегментов стен от проемов
-        pillars: список колонн (игнорируется при определении внешних стен)
+        wall_segments_from_junctions: список сегментов стен от соединений
+        openings: список проемов
+        pillars: список колонн (опционально)
+        boundary_threshold: порог близости к границе в пикселях
     
     Returns:
-        bool: True если стена внешняя, False если внутренняя
+        set: множество ID внешних сегментов
     """
-    # Проверяем, связан ли сегмент стены с окном
-    if "opening_id" in segment_data:
-        opening_id = segment_data["opening_id"]
-        for opening in openings:
-            if opening["id"] == opening_id and opening["type"] == "window":
-                return True
+    # Объединяем все сегменты
+    all_segments = wall_segments_from_openings.copy()
+    if wall_segments_from_junctions:
+        all_segments.extend(wall_segments_from_junctions)
     
-    # Собираем все координаты стен для определения границ (исключая колонны)
+    # Собираем все координаты для определения границ здания
     all_x_coords = []
     all_y_coords = []
     
-    for segment in wall_segments_from_openings:
-        seg_bbox = segment["bbox"]
-        all_x_coords.extend([seg_bbox["x"], seg_bbox["x"] + seg_bbox["width"]])
-        all_y_coords.extend([seg_bbox["y"], seg_bbox["y"] + seg_bbox["height"]])
+    # Добавляем координаты сегментов стен
+    for segment in all_segments:
+        bbox = segment["bbox"]
+        all_x_coords.extend([bbox["x"], bbox["x"] + bbox["width"]])
+        all_y_coords.extend([bbox["y"], bbox["y"] + bbox["height"]])
     
-    # Добавляем координаты текущего сегмента
-    bbox = segment_data["bbox"]
-    all_x_coords.extend([bbox["x"], bbox["x"] + bbox["width"]])
-    all_y_coords.extend([bbox["y"], bbox["y"] + bbox["height"]])
+    # Добавляем координаты колонн
+    if pillars:
+        for pillar in pillars:
+            bbox = pillar["bbox"]
+            all_x_coords.extend([bbox["x"], bbox["x"] + bbox["width"]])
+            all_y_coords.extend([bbox["y"], bbox["y"] + bbox["height"]])
     
-    if all_x_coords and all_y_coords:
-        min_x, max_x = min(all_x_coords), max(all_x_coords)
-        min_y, max_y = min(all_y_coords), max(all_y_coords)
-        
-        # Проверяем, находится ли стена на границе
+    if not all_x_coords or not all_y_coords:
+        return set()
+    
+    # Определяем границы здания
+    min_x, max_x = min(all_x_coords), max(all_x_coords)
+    min_y, max_y = min(all_y_coords), max(all_y_coords)
+    
+    # Определяем внешние сегменты с учетом порога близости
+    external_segments = set()
+    
+    for segment in all_segments:
+        bbox = segment["bbox"]
         wall_left = bbox["x"]
         wall_right = bbox["x"] + bbox["width"]
         wall_top = bbox["y"]
         wall_bottom = bbox["y"] + bbox["height"]
         
-        # Добавляем небольшой допуск (5 пикселей)
-        tolerance = 5
-        is_boundary = (
-            abs(wall_left - min_x) <= tolerance or
-            abs(wall_right - max_x) <= tolerance or
-            abs(wall_top - min_y) <= tolerance or
-            abs(wall_bottom - max_y) <= tolerance
+        # Проверяем, находится ли стена близко к границе
+        is_near_boundary = (
+            wall_left <= min_x + boundary_threshold or
+            wall_right >= max_x - boundary_threshold or
+            wall_top <= min_y + boundary_threshold or
+            wall_bottom >= max_y - boundary_threshold
         )
         
-        # Колонны игнорируются при определении внешних стен
-        # Стена на границе всегда считается внешней
-        
-        if is_boundary:
-            return True
+        if is_near_boundary:
+            external_segments.add(segment["segment_id"])
     
-    return False
+    # Дополнительная проверка: сегменты с окнами всегда внешние
+    window_ids = {opening["id"] for opening in openings if opening["type"] == "window"}
+    
+    for segment in wall_segments_from_openings:
+        if "opening_id" in segment and segment["opening_id"] in window_ids:
+            external_segments.add(segment["segment_id"])
+    
+    return external_segments
+
+def is_external_wall(segment_data, external_wall_ids):
+    """
+    Определяет, является ли стена внешней на основе предварительно вычисленных ID
+    
+    Args:
+        segment_data: данные сегмента стены
+        external_wall_ids: множество ID внешних стен
+    
+    Returns:
+        bool: True если стена внешняя, False если внутренняя
+    """
+    return segment_data["segment_id"] in external_wall_ids
 
 def load_brick_texture(texture_path="brick_texture.jpg"):
     """
@@ -1306,6 +1332,17 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             else:
                 print("Текстура кирпича не найдена, внешние стены будут иметь стандартный материал")
         
+        # Предварительно определяем внешние стены
+        print("Определение внешних стен...")
+        external_wall_ids = detect_external_walls(
+            wall_segments_from_openings,
+            wall_segments_from_junctions,
+            openings,
+            pillars,
+            boundary_threshold=50.0  # Увеличиваем порог для максимального покрытия
+        )
+        print(f"  Найдено внешних стен: {len(external_wall_ids)}")
+        
         # Создаем стены из сегментов от проемов
         wall_objects = []
         external_walls_count = 0
@@ -1313,7 +1350,7 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         print("Создание стен...")
         for i, segment in enumerate(wall_segments_from_openings):
             # Проверяем, является ли стена внешней
-            is_ext = is_external_wall(segment, openings, wall_segments_from_openings, pillars)
+            is_ext = is_external_wall(segment, external_wall_ids)
             
             # Создаем стену с соответствующим материалом
             wall_obj = create_wall_mesh(segment, wall_height_meters, wall_thickness, scale_factor,
@@ -1330,7 +1367,7 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         # Создаем стены из сегментов от соединений
         for segment in wall_segments_from_junctions:
             # Проверяем, является ли стена внешней
-            is_ext = is_external_wall(segment, openings, wall_segments_from_openings, pillars)
+            is_ext = is_external_wall(segment, external_wall_ids)
             
             # Создаем стену с соответствующим материалом
             wall_obj = create_wall_mesh(segment, wall_height_meters, wall_thickness, scale_factor,
