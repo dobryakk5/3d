@@ -274,14 +274,37 @@ def extract_junctions(prediction, threshold=0.3):
         5: 'door_right_corner',
         6: 'window_left_corner',
         7: 'window_right_corner',
+        # Добавляем остальные типы для полноты
+        8: 'wall_junction_t',
+        9: 'wall_junction_cross',
+        10: 'wall_junction_l',
+        11: 'door_corner',
+        12: 'window_corner',
+        13: 'wall_intersection',
+        14: 'wall_end',
+        15: 'door_frame',
+        16: 'window_frame',
+        17: 'room_corner',
+        18: 'opening_corner',
+        19: 'structure_corner',
+        20: 'junction_unknown'
     }
 
     all_junctions = {}
+    junction_index = 1  # Начинаем индексацию с 1
+    
     for ch_idx in range(21):
         points = find_junction_points(heatmaps[ch_idx], threshold)
         if points:
             type_name = HEATMAP_TYPES.get(ch_idx, f'unknown_{ch_idx}')
-            all_junctions[type_name] = points
+            # Добавляем индекс к каждому junction
+            indexed_points = []
+            for point in points:
+                point_with_id = point.copy()
+                point_with_id['id'] = junction_index
+                indexed_points.append(point_with_id)
+                junction_index += 1
+            all_junctions[type_name] = indexed_points
 
     return all_junctions
 

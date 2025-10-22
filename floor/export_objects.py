@@ -721,11 +721,18 @@ def extract_wall_polygons_with_classification(wall_mask, min_vertices=4, epsilon
     return wall_polygons, pillar_polygons
 
 def categorize_junctions(junctions_dict):
-    """Collect all junctions without categorization"""
+    """Collect all junctions without changing existing indices"""
     all_junctions = []
+    
     for jtype, points in junctions_dict.items():
         for p in points:
-            all_junctions.append({**p, 'type': jtype})
+            junction_data = {**p, 'type': jtype}
+            # Если у junction уже есть id, сохраняем его
+            # Если нет, присваиваем новый индекс
+            if 'id' not in junction_data:
+                junction_data['id'] = len(all_junctions) + 1
+            all_junctions.append(junction_data)
+    
     return all_junctions
 
 def analyze_detection_method(detection, wall_segments, all_junctions):
@@ -818,6 +825,99 @@ def find_wall_for_opening(opening, wall_segments):
                 best_wall = i
     
     return best_wall
+
+def find_junctions_for_opening(opening, all_junctions, max_distance=50):
+    """
+    Находит ближайшие junctions для проема (двери/окна)
+    
+    Args:
+        opening: Проем с bbox {'x', 'y', 'width', 'height'}
+        all_junctions: Список всех junctions
+        max_distance: Максимальное расстояние для поиска junctions
+        
+    Returns:
+        dict: Словарь с junctions для каждой стороны проема
+    """
+    # Поддерживаем оба формата bbox: {'x', 'y', 'width', 'height'} и кортеж (x, y, w, h)
+    if isinstance(opening['bbox'], dict):
+        x, y, w, h = opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height']
+    else:
+        # Если bbox это кортеж или список
+        x, y, w, h = opening['bbox']
+    
+    # Вычисляем центры сторон проема
+    left_center = (x, y + h/2)
+    right_center = (x + w, y + h/2)
+    top_center = (x + w/2, y)
+    bottom_center = (x + w/2, y + h)
+    
+    # Функция для поиска ближайшего junction к точке
+    def find_nearest_junction(point, junctions, max_dist):
+        min_dist = float('inf')
+        nearest_junction = None
+        
+        for junction in junctions:
+            jx, jy = junction['x'], junction['y']
+            dist = np.sqrt((jx - point[0])**2 + (jy - point[1])**2)
+            
+            if dist < min_dist and dist <= max_dist:
+                min_dist = dist
+                nearest_junction = junction
+        
+        return nearest_junction
+    
+    # Находим junctions для каждой стороны
+    junctions_for_opening = {}
+    
+    # Левая сторона
+    left_junction = find_nearest_junction(left_center, all_junctions, max_distance)
+    if left_junction:
+        junctions_for_opening['left'] = {
+            'junction_id': left_junction.get('id'),
+            'junction_name': f"J{left_junction.get('id')}" if left_junction.get('id') else None,
+            'junction_type': left_junction.get('type'),
+            'x': left_junction['x'],
+            'y': left_junction['y'],
+            'distance': np.sqrt((left_junction['x'] - left_center[0])**2 + (left_junction['y'] - left_center[1])**2)
+        }
+    
+    # Правая сторона
+    right_junction = find_nearest_junction(right_center, all_junctions, max_distance)
+    if right_junction:
+        junctions_for_opening['right'] = {
+            'junction_id': right_junction.get('id'),
+            'junction_name': f"J{right_junction.get('id')}" if right_junction.get('id') else None,
+            'junction_type': right_junction.get('type'),
+            'x': right_junction['x'],
+            'y': right_junction['y'],
+            'distance': np.sqrt((right_junction['x'] - right_center[0])**2 + (right_junction['y'] - right_center[1])**2)
+        }
+    
+    # Верхняя сторона
+    top_junction = find_nearest_junction(top_center, all_junctions, max_distance)
+    if top_junction:
+        junctions_for_opening['up'] = {
+            'junction_id': top_junction.get('id'),
+            'junction_name': f"J{top_junction.get('id')}" if top_junction.get('id') else None,
+            'junction_type': top_junction.get('type'),
+            'x': top_junction['x'],
+            'y': top_junction['y'],
+            'distance': np.sqrt((top_junction['x'] - top_center[0])**2 + (top_junction['y'] - top_center[1])**2)
+        }
+    
+    # Нижняя сторона
+    bottom_junction = find_nearest_junction(bottom_center, all_junctions, max_distance)
+    if bottom_junction:
+        junctions_for_opening['down'] = {
+            'junction_id': bottom_junction.get('id'),
+            'junction_name': f"J{bottom_junction.get('id')}" if bottom_junction.get('id') else None,
+            'junction_type': bottom_junction.get('type'),
+            'x': bottom_junction['x'],
+            'y': bottom_junction['y'],
+            'distance': np.sqrt((bottom_junction['x'] - bottom_center[0])**2 + (bottom_junction['y'] - bottom_center[1])**2)
+        }
+    
+    return junctions_for_opening
 
 def detect_pillars_for_export(image, wall_mask, wall_segments, min_area=100, max_area=60000):
     """
@@ -1372,8 +1472,30 @@ def find_building_outline_from_junctions(junctions, pillar_polygons=None, openin
             "source": "insufficient_outline_points"
         }
     
-    # Создаем полигон
-    vertices = [{"x": p["x"], "y": p["y"]} for p in outline_points]
+    # Создаем полигон с информацией о junctions для каждой вершины
+    vertices = []
+    for p in outline_points:
+        # Находим соответствующий junction в исходном списке
+        junction_id = None
+        junction_type = None
+        for j in junctions:
+            if abs(j['x'] - p['x']) < 1 and abs(j['y'] - p['y']) < 1:
+                junction_id = j.get('id')
+                junction_type = j['type']
+                break
+        
+        vertex_data = {
+            "x": p["x"],
+            "y": p["y"]
+        }
+        
+        # Добавляем информацию о junction, если она найдена
+        if junction_id is not None:
+            vertex_data["junction_name"] = f"J{junction_id}"
+            vertex_data["junction_id"] = junction_id
+            vertex_data["junction_type"] = junction_type
+        
+        vertices.append(vertex_data)
     
     # Вычисляем площадь и периметр
     area = 0
@@ -2057,6 +2179,9 @@ def main():
             x, y, w, h = window['bbox']
             wall_id = find_wall_for_opening(window, wall_segments)
             
+            # Находим junctions для окна
+            window_junctions = find_junctions_for_opening(window, all_junctions, max_distance=50)
+            
             window_data = {
                 "id": f"window_{i+1}",
                 "type": "window",
@@ -2064,7 +2189,8 @@ def main():
                 "wall_id": f"wall_{wall_id+1}" if wall_id is not None else None,
                 "height": 1.5,
                 "sill_height": 1.0,
-                "methods": window['methods']
+                "methods": window['methods'],
+                "junctions": window_junctions  # Добавляем junctions
             }
             
             # Add confidence values
@@ -2082,13 +2208,17 @@ def main():
             x, y, w, h = door['bbox']
             wall_id = find_wall_for_opening(door, wall_segments)
             
+            # Находим junctions для двери
+            door_junctions = find_junctions_for_opening(door, all_junctions, max_distance=50)
+            
             door_data = {
                 "id": f"door_{i+1}",
                 "type": "door",
                 "bbox": {"x": float(x), "y": float(y), "width": float(w), "height": float(h)},
                 "wall_id": f"wall_{wall_id+1}" if wall_id is not None else None,
                 "height": 2.1,
-                "methods": door['methods']
+                "methods": door['methods'],
+                "junctions": door_junctions  # Добавляем junctions
             }
             
             # Add confidence values
@@ -2150,6 +2280,9 @@ def main():
                 "y": float(junction['y']),
                 "type": junction['type']
             }
+            # Добавляем ID, если он существует
+            if 'id' in junction:
+                junction_data["id"] = junction['id']
             json_data["junctions"].append(junction_data)
 
         # Extract rooms

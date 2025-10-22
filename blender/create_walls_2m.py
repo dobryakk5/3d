@@ -5,79 +5,136 @@ import os
 from mathutils import Vector, Matrix
 import random
 
-def detect_external_walls(wall_segments_from_openings, wall_segments_from_junctions,
-                         openings, pillars=None, boundary_threshold=20.0):
+def point_to_line_distance(point, line_start, line_end):
     """
-    Определяет внешние стены на основе анализа границ здания и наличия окон
+    Вычисляет расстояние от точки до отрезка
+    
+    Args:
+        point: точка (x, y)
+        line_start: начало отрезка (x, y)
+        line_end: конец отрезка (x, y)
+    
+    Returns:
+        float: расстояние от точки до отрезка
+    """
+    import math
+    
+    px, py = point
+    x1, y1 = line_start
+    x2, y2 = line_end
+    
+    # Длина отрезка в квадрате
+    line_length_sq = (x2 - x1) ** 2 + (y2 - y1) ** 2
+    
+    if line_length_sq == 0:
+        # Отрезок вырожден в точку
+        return math.sqrt((px - x1) ** 2 + (py - y1) ** 2)
+    
+    # Параметр t для проекции точки на отрезок
+    t = max(0, min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / line_length_sq))
+    
+    # Ближайшая точка на отрезке
+    projection_x = x1 + t * (x2 - x1)
+    projection_y = y1 + t * (y2 - y1)
+    
+    # Расстояние от точки до проекции
+    return math.sqrt((px - projection_x) ** 2 + (py - projection_y) ** 2)
+
+def is_bbox_on_outline(bbox, outline_vertices, tolerance):
+    """
+    Проверяет, пересекается ли bounding box с контуром здания
+    
+    Args:
+        bbox: bounding box элемента {"x":, "y":, "width":, "height":}
+        outline_vertices: список вершин контура здания [{"x":, "y":}, ...]
+        tolerance: допустимое расстояние до контура (толщина стены)
+    
+    Returns:
+        bool: True если bbox пересекается с контуром
+    """
+    # Получаем углы bbox
+    bbox_corners = [
+        (bbox["x"], bbox["y"]),
+        (bbox["x"] + bbox["width"], bbox["y"]),
+        (bbox["x"] + bbox["width"], bbox["y"] + bbox["height"]),
+        (bbox["x"], bbox["y"] + bbox["height"])
+    ]
+    
+    # Проверяем каждый угол bbox на близость к контуру
+    for corner in bbox_corners:
+        for i in range(len(outline_vertices)):
+            start_vertex = outline_vertices[i]
+            end_vertex = outline_vertices[(i + 1) % len(outline_vertices)]
+            
+            distance = point_to_line_distance(
+                corner,
+                (start_vertex["x"], start_vertex["y"]),
+                (end_vertex["x"], end_vertex["y"])
+            )
+            
+            if distance <= tolerance:
+                return True
+    
+    # Также проверяем центр bbox
+    center_x = bbox["x"] + bbox["width"] / 2
+    center_y = bbox["y"] + bbox["height"] / 2
+    
+    for i in range(len(outline_vertices)):
+        start_vertex = outline_vertices[i]
+        end_vertex = outline_vertices[(i + 1) % len(outline_vertices)]
+        
+        distance = point_to_line_distance(
+            (center_x, center_y),
+            (start_vertex["x"], start_vertex["y"]),
+            (end_vertex["x"], end_vertex["y"])
+        )
+        
+        if distance <= tolerance:
+            return True
+    
+    return False
+
+def mark_external_elements_by_outline(wall_segments_from_openings, wall_segments_from_junctions,
+                                    openings, outline_vertices, wall_thickness, scale_factor=1.0):
+    """
+    Определяет внешние стены и проемы на основе контура здания
     
     Args:
         wall_segments_from_openings: список сегментов стен от проемов
         wall_segments_from_junctions: список сегментов стен от соединений
         openings: список проемов
-        pillars: список колонн (опционально)
-        boundary_threshold: порог близости к границе в пикселях
+        outline_vertices: вершины контура здания
+        wall_thickness: толщина стены
+        scale_factor: масштабный коэффициент
     
     Returns:
-        set: множество ID внешних сегментов
+        tuple: (external_wall_ids, external_opening_ids)
     """
-    # Объединяем все сегменты
-    all_segments = wall_segments_from_openings.copy()
-    if wall_segments_from_junctions:
-        all_segments.extend(wall_segments_from_junctions)
+    # Применяем масштабирование к толщине стены для tolerance
+    tolerance = wall_thickness * scale_factor
     
-    # Собираем все координаты для определения границ здания
-    all_x_coords = []
-    all_y_coords = []
+    external_wall_ids = set()
+    external_opening_ids = set()
     
-    # Добавляем координаты сегментов стен
-    for segment in all_segments:
-        bbox = segment["bbox"]
-        all_x_coords.extend([bbox["x"], bbox["x"] + bbox["width"]])
-        all_y_coords.extend([bbox["y"], bbox["y"] + bbox["height"]])
-    
-    # Добавляем координаты колонн
-    if pillars:
-        for pillar in pillars:
-            bbox = pillar["bbox"]
-            all_x_coords.extend([bbox["x"], bbox["x"] + bbox["width"]])
-            all_y_coords.extend([bbox["y"], bbox["y"] + bbox["height"]])
-    
-    if not all_x_coords or not all_y_coords:
-        return set()
-    
-    # Определяем границы здания
-    min_x, max_x = min(all_x_coords), max(all_x_coords)
-    min_y, max_y = min(all_y_coords), max(all_y_coords)
-    
-    # Определяем внешние сегменты с учетом порога близости
-    external_segments = set()
-    
-    for segment in all_segments:
-        bbox = segment["bbox"]
-        wall_left = bbox["x"]
-        wall_right = bbox["x"] + bbox["width"]
-        wall_top = bbox["y"]
-        wall_bottom = bbox["y"] + bbox["height"]
-        
-        # Проверяем, находится ли стена близко к границе
-        is_near_boundary = (
-            wall_left <= min_x + boundary_threshold or
-            wall_right >= max_x - boundary_threshold or
-            wall_top <= min_y + boundary_threshold or
-            wall_bottom >= max_y - boundary_threshold
-        )
-        
-        if is_near_boundary:
-            external_segments.add(segment["segment_id"])
-    
-    # Дополнительная проверка: сегменты с окнами всегда внешние
-    window_ids = {opening["id"] for opening in openings if opening["type"] == "window"}
-    
+    # Проверяем сегменты стен от проемов
     for segment in wall_segments_from_openings:
-        if "opening_id" in segment and segment["opening_id"] in window_ids:
-            external_segments.add(segment["segment_id"])
+        if is_bbox_on_outline(segment["bbox"], outline_vertices, tolerance):
+            external_wall_ids.add(segment["segment_id"])
+            # Также отмечаем связанный проем как внешний
+            if "opening_id" in segment:
+                external_opening_ids.add(segment["opening_id"])
     
-    return external_segments
+    # Проверяем сегменты стен от соединений
+    for segment in wall_segments_from_junctions:
+        if is_bbox_on_outline(segment["bbox"], outline_vertices, tolerance):
+            external_wall_ids.add(segment["segment_id"])
+    
+    # Дополнительно проверяем проемы, которые могут не быть связаны с внешними сегментами
+    for opening in openings:
+        if is_bbox_on_outline(opening["bbox"], outline_vertices, tolerance):
+            external_opening_ids.add(opening["id"])
+    
+    return external_wall_ids, external_opening_ids
 
 def is_external_wall(segment_data, external_wall_ids):
     """
@@ -91,6 +148,19 @@ def is_external_wall(segment_data, external_wall_ids):
         bool: True если стена внешняя, False если внутренняя
     """
     return segment_data["segment_id"] in external_wall_ids
+
+def is_external_opening(opening_data, external_opening_ids):
+    """
+    Определяет, является ли проем внешним на основе предварительно вычисленных ID
+    
+    Args:
+        opening_data: данные проема
+        external_opening_ids: множество ID внешних проемов
+    
+    Returns:
+        bool: True если проем внешний, False если внутренний
+    """
+    return opening_data["id"] in external_opening_ids
 
 def load_brick_texture(texture_path="brick_texture.jpg"):
     """
@@ -153,6 +223,60 @@ def load_brick_texture(texture_path="brick_texture.jpg"):
     links.new(mapping.outputs['Vector'], texture_node.inputs['Vector'])
     links.new(texture_node.outputs['Color'], principled_bsdf.inputs['Base Color'])
     links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+    
+    return brick_mat
+
+def create_procedural_brick_material():
+    """
+    Создает процедурный материал кирпича без использования файла текстуры
+    """
+    # Создаем новый материал
+    brick_mat = bpy.data.materials.new(name="ProceduralBrickMaterial")
+    brick_mat.use_nodes = True
+    
+    # Получаем узлы материала
+    nodes = brick_mat.node_tree.nodes
+    links = brick_mat.node_tree.links
+    
+    # Очищаем стандартные узлы
+    nodes.clear()
+    
+    # Создаем основные узлы
+    output_node = nodes.new(type='ShaderNodeOutputMaterial')
+    principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    
+    # Создаем узел для процедурной текстуры кирпича
+    brick_texture = nodes.new(type='ShaderNodeTexBrick')
+    brick_texture.inputs['Scale'].default_value = 5.0
+    brick_texture.inputs['Mortar Size'].default_value = 0.02
+    brick_texture.inputs['Mortar Smooth'].default_value = 1.0
+    brick_texture.inputs['Bias'].default_value = 0.0
+    brick_texture.inputs['Brick Width'].default_value = 0.5
+    brick_texture.inputs['Row Height'].default_value = 0.25
+    
+    # Создаем узлы для цветов кирпича и раствора
+    brick_color = nodes.new(type='ShaderNodeRGB')
+    brick_color.outputs['Color'].default_value = (0.6, 0.4, 0.2, 1.0)  # Цвет кирпича
+    
+    mortar_color = nodes.new(type='ShaderNodeRGB')
+    mortar_color.outputs['Color'].default_value = (0.8, 0.8, 0.8, 1.0)  # Цвет раствора
+    
+    # Создаем узел для смешивания цветов
+    mix_color = nodes.new(type='ShaderNodeMixRGB')
+    mix_color.inputs['Fac'].default_value = 1.0  # Полное смешивание
+    
+    # Соединяем узлы
+    links.new(brick_texture.outputs['Color'], mix_color.inputs['Fac'])
+    links.new(brick_color.outputs['Color'], mix_color.inputs['Color1'])
+    links.new(mortar_color.outputs['Color'], mix_color.inputs['Color2'])
+    links.new(mix_color.outputs['Color'], principled_bsdf.inputs['Base Color'])
+    links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+    
+    # Настраиваем параметры материала для лучшего отображения
+    principled_bsdf.inputs['Roughness'].default_value = 0.8  # Добавляем шероховатость
+    principled_bsdf.inputs['Specular'].default_value = 0.2  # Уменьшаем блики
+    
+    print("Создана процедурная текстура кирпича")
     
     return brick_mat
 
@@ -315,52 +439,60 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
                 if face.normal.z > 0.5:  # Верхняя грань
                     # UV для верхней грани
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (width/10, 0)  # Масштаб 10 пикселей = 1 единица UV
-                    face.loops[2][uv_layer].uv = (width/10, height/10)
-                    face.loops[3][uv_layer].uv = (0, height/10)
+                    face.loops[1][uv_layer].uv = (width/2, 0)  # Увеличиваем масштаб для лучшей видимости
+                    face.loops[2][uv_layer].uv = (width/2, height/2)
+                    face.loops[3][uv_layer].uv = (0, height/2)
                 elif face.normal.z < -0.5:  # Нижняя грань
                     # UV для нижней грани
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (width/10, 0)
-                    face.loops[2][uv_layer].uv = (width/10, height/10)
-                    face.loops[3][uv_layer].uv = (0, height/10)
-                elif abs(face.normal.x) > 0.5:  # Боковые грани по X
-                    # UV для боковых граней
+                    face.loops[1][uv_layer].uv = (width/2, 0)
+                    face.loops[2][uv_layer].uv = (width/2, height/2)
+                    face.loops[3][uv_layer].uv = (0, height/2)
+                elif abs(face.normal.x) > 0.5:  # Боковые грани по X (внешняя сторона)
+                    # UV для боковых граней - ВНЕШНЯЯ СТОРОНА
+                    # Определяем, какая сторона внешняя (направлена от центра здания)
+                    # Для горизонтальных стен внешняя сторона обычно по оси Y
+                    if face.normal.y > 0:  # Передняя сторона (возможно внешняя)
+                        face.loops[0][uv_layer].uv = (0, 0)
+                        face.loops[1][uv_layer].uv = (width/2, 0)
+                        face.loops[2][uv_layer].uv = (width/2, wall_height/2)
+                        face.loops[3][uv_layer].uv = (0, wall_height/2)
+                    else:  # Задняя сторона (возможно внутренняя)
+                        face.loops[0][uv_layer].uv = (0, 0)
+                        face.loops[1][uv_layer].uv = (width/2, 0)
+                        face.loops[2][uv_layer].uv = (width/2, wall_height/2)
+                        face.loops[3][uv_layer].uv = (0, wall_height/2)
+                else:  # Боковые грани по Y - НАИБОЛЕЕ ВЕРОЯТНАЯ ВНЕШНЯЯ СТОРОНА
+                    # UV для боковых граней с улучшенным масштабом
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (width/10, 0)
-                    face.loops[2][uv_layer].uv = (width/10, wall_height/10)
-                    face.loops[3][uv_layer].uv = (0, wall_height/10)
-                else:  # Боковые грани по Y
-                    # UV для боковых граней
-                    face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (height/10, 0)
-                    face.loops[2][uv_layer].uv = (height/10, wall_height/10)
-                    face.loops[3][uv_layer].uv = (0, wall_height/10)
+                    face.loops[1][uv_layer].uv = (height/2, 0)
+                    face.loops[2][uv_layer].uv = (height/2, wall_height/2)
+                    face.loops[3][uv_layer].uv = (0, wall_height/2)
             else:  # vertical
                 if face.normal.z > 0.5:  # Верхняя грань
                     # UV для верхней грани
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (width/10, 0)
-                    face.loops[2][uv_layer].uv = (width/10, height/10)
-                    face.loops[3][uv_layer].uv = (0, height/10)
+                    face.loops[1][uv_layer].uv = (width/2, 0)
+                    face.loops[2][uv_layer].uv = (width/2, height/2)
+                    face.loops[3][uv_layer].uv = (0, height/2)
                 elif face.normal.z < -0.5:  # Нижняя грань
                     # UV для нижней грани
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (width/10, 0)
-                    face.loops[2][uv_layer].uv = (width/10, height/10)
-                    face.loops[3][uv_layer].uv = (0, height/10)
-                elif abs(face.normal.x) > 0.5:  # Боковые грани по X
-                    # UV для боковых граней
+                    face.loops[1][uv_layer].uv = (width/2, 0)
+                    face.loops[2][uv_layer].uv = (width/2, height/2)
+                    face.loops[3][uv_layer].uv = (0, height/2)
+                elif abs(face.normal.x) > 0.5:  # Боковые грани по X - НАИБОЛЕЕ ВЕРОЯТНАЯ ВНЕШНЯЯ СТОРОНА
+                    # UV для боковых граней с улучшенным масштабом
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (width/10, 0)
-                    face.loops[2][uv_layer].uv = (width/10, wall_height/10)
-                    face.loops[3][uv_layer].uv = (0, wall_height/10)
+                    face.loops[1][uv_layer].uv = (height/2, 0)
+                    face.loops[2][uv_layer].uv = (height/2, wall_height/2)
+                    face.loops[3][uv_layer].uv = (0, wall_height/2)
                 else:  # Боковые грани по Y
                     # UV для боковых граней
                     face.loops[0][uv_layer].uv = (0, 0)
-                    face.loops[1][uv_layer].uv = (height/10, 0)
-                    face.loops[2][uv_layer].uv = (height/10, wall_height/10)
-                    face.loops[3][uv_layer].uv = (0, wall_height/10)
+                    face.loops[1][uv_layer].uv = (width/2, 0)
+                    face.loops[2][uv_layer].uv = (width/2, wall_height/2)
+                    face.loops[3][uv_layer].uv = (0, wall_height/2)
     
     # Обновляем нормали
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -375,11 +507,17 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     
     # Применяем материал в зависимости от типа стены
     if is_external and brick_material:
-        # Внешняя стена с текстурой кирпича
+        # Внешняя стена с желтым цветом для визуальной проверки
+        # Временно заменяем текстуру на желтый цвет
+        yellow_mat = bpy.data.materials.new(name="ExternalWallDebug")
+        yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+        
         if obj.data.materials:
-            obj.data.materials[0] = brick_material
+            obj.data.materials[0] = yellow_mat
         else:
-            obj.data.materials.append(brick_material)
+            obj.data.materials.append(yellow_mat)
+            
+        print(f"    ВНЕШНЯЯ СТЕНА (отмечена желтым): {segment_data['segment_id']}")
     else:
         # Внутренняя стена или стандартный материал
         mat = bpy.data.materials.new(name="WallMaterial")
@@ -392,10 +530,17 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     
     return obj
 
-def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=1.0):
+def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False):
     """
     Создает 3D меш для проема (окна или двери) используя точные координаты из JSON
     без расширения за счет толщины стен, чтобы проемы были вертикальными без углублений
+    
+    Args:
+        opening_data: данные проема из JSON
+        wall_height: высота стены
+        wall_thickness: толщина стены
+        scale_factor: масштабный коэффициент
+        is_external: является ли проем внешним (для выбора материала)
     """
     bbox = opening_data["bbox"]
     orientation = opening_data.get("orientation", "horizontal")
@@ -472,15 +617,25 @@ def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=
     obj = bpy.data.objects.new(mesh.name, mesh)
     bpy.context.collection.objects.link(obj)
     
-    # Применяем материал в зависимости от типа проема
+    # Применяем материал в зависимости от типа проема и расположения
     if opening_data["type"] == "door":
-        # Зелёный материал для дверей
-        mat = bpy.data.materials.new(name="DoorMaterial")
-        mat.diffuse_color = (0.0, 0.8, 0.0, 1.0)  # Зелёный
+        if is_external:
+            # Тёмно-зелёный материал для внешних дверей
+            mat = bpy.data.materials.new(name="ExternalDoorMaterial")
+            mat.diffuse_color = (0.0, 0.6, 0.0, 1.0)  # Тёмно-зелёный
+        else:
+            # Зелёный материал для внутренних дверей
+            mat = bpy.data.materials.new(name="InternalDoorMaterial")
+            mat.diffuse_color = (0.0, 0.8, 0.0, 1.0)  # Зелёный
     else:  # window
-        # Голубой материал для окон
-        mat = bpy.data.materials.new(name="WindowMaterial")
-        mat.diffuse_color = (0.5, 0.7, 1.0, 1.0)  # Голубой
+        if is_external:
+            # Тёмно-голубой материал для внешних окон
+            mat = bpy.data.materials.new(name="ExternalWindowMaterial")
+            mat.diffuse_color = (0.3, 0.5, 0.8, 1.0)  # Тёмно-голубой
+        else:
+            # Голубой материал для внутренних окон
+            mat = bpy.data.materials.new(name="InternalWindowMaterial")
+            mat.diffuse_color = (0.5, 0.7, 1.0, 1.0)  # Голубой
     
     # Применяем материал к объекту
     if obj.data.materials:
@@ -1135,17 +1290,39 @@ def setup_isometric_camera_and_render(output_path="isometric_view.jpg"):
         # Устанавливаем движок рендера (EEVEE_NEXT работает быстрее в фоновом режиме)
         scene.render.engine = 'BLENDER_EEVEE_NEXT'
         
-        # Настраиваем базовые параметры EEVEE_NEXT
-        scene.eevee.taa_render_samples = 64
-        # Устанавливаем только базовые параметры, которые гарантированно работают
+        # Настраиваем параметры EEVEE_NEXT для качественного отображения текстур
+        scene.eevee.taa_render_samples = 128  # Увеличиваем количество сэмплов для лучшего качества
+        
+        # Настраиваем параметры теней для лучшего отображения текстур
         try:
-            # Пробуем установить параметры теней
+            # Включаем тени
+            scene.eevee.use_shadows = True
+            
+            # Устанавливаем качество теней
             if hasattr(scene.eevee, 'shadow_cube_size'):
-                scene.eevee.shadow_cube_size = '1024'
+                scene.eevee.shadow_cube_size = '2048'  # Увеличиваем качество теней
             if hasattr(scene.eevee, 'shadow_cascade_size'):
-                scene.eevee.shadow_cascade_size = '2048'
-        except:
-            print("Предупреждение: Не удалось установить параметры теней EEVEE")
+                scene.eevee.shadow_cascade_size = '2048'  # Увеличиваем качество каскадных теней
+            
+            # Настраиваем параметры освещения для текстур
+            if hasattr(scene.eevee, 'shadow_softness'):
+                scene.eevee.shadow_softness = 0.2  # Мягкие тени
+            
+            # Включаем экранное пространственное затенение (SSAO) для лучшего восприятия текстур
+            if hasattr(scene.eevee, 'use_ssr'):
+                scene.eevee.use_ssr = True  # Включаем отражения
+            if hasattr(scene.eevee, 'use_sao'):
+                scene.eevee.use_sao = True  # Включаем затенение окружения
+                
+            # Настраиваем параметрыAmbient Occlusion для лучшего восприятия текстур
+            if hasattr(scene.eevee, 'gtao_distance'):
+                scene.eevee.gtao_distance = 0.2  # Расстояние для затенения
+            if hasattr(scene.eevee, 'gtao_thickness'):
+                scene.eevee.gtao_thickness = 0.1  # Толщина для затенения
+                
+        except Exception as e:
+            print(f"Предупреждение: Не удалось установить все параметры рендера EEVEE: {e}")
+            print("Используем базовые параметры")
         
         # Настраиваем параметры файла
         scene.render.image_settings.file_format = 'JPEG'
@@ -1166,19 +1343,19 @@ def setup_isometric_camera_and_render(output_path="isometric_view.jpg"):
         # Создаем директорию, если она не существует
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        # Настраиваем освещение для EEVEE_NEXT
+        # Настраиваем освещение для EEVEE_NEXT с улучшенным отображением текстур
         # Удаляем существующее освещение
         bpy.ops.object.select_by_type(type='LIGHT')
         bpy.ops.object.delete()
         
-        # Добавляем мягкий солнечный свет с меньшей энергией
+        # Добавляем основной солнечный свет для яркого освещения текстур
         bpy.ops.object.light_add(type='SUN')
         sun_light = bpy.context.active_object
         sun_light.name = "SunLight"
         sun_light.location = (5, 5, 10)
         sun_light.rotation_euler = (0.5, -0.5, 0.5)
-        sun_light.data.energy = 3.0  # Уменьшаем энергию для мягкости
-        sun_light.data.angle = 0.2  # Добавляем небольшой угол для мягкости
+        sun_light.data.energy = 5.0  # Увеличиваем энергию для лучшей видимости текстур
+        sun_light.data.angle = 0.1  # Уменьшаем угол для более четких теней
         
         # Добавляем большой заполняющий свет с мягкими тенями
         bpy.ops.object.light_add(type='AREA')
@@ -1186,26 +1363,35 @@ def setup_isometric_camera_and_render(output_path="isometric_view.jpg"):
         fill_light.name = "FillLight"
         fill_light.location = (0, 0, 8)
         fill_light.rotation_euler = (0, 0, 0)
-        fill_light.data.energy = 2.0  # Уменьшаем энергию
+        fill_light.data.energy = 3.0  # Увеличиваем энергию
         fill_light.data.size = 20.0  # Увеличиваем размер для более мягкого света
         
-        # Добавляем мягкий свет сбоку для подсветки деталей
+        # Добавляем свет сбоку для подсветки текстур на боковых поверхностях
         bpy.ops.object.light_add(type='AREA')
         side_light = bpy.context.active_object
         side_light.name = "SideLight"
-        side_light.location = (10, 0, 5)
+        side_light.location = (-10, 0, 5)
         side_light.rotation_euler = (0, 1.57, 0)  # Поворот на 90 градусов
-        side_light.data.energy = 1.5  # Низкая энергия для мягкой подсветки
+        side_light.data.energy = 2.5  # Увеличиваем энергию для подсветки боковых поверхностей
         side_light.data.size = 15.0  # Большой размер для мягкости
         
-        # Добавляем свет снизу для уменьшения контраста
+        # Добавляем второй свет сбоку с другой стороны
         bpy.ops.object.light_add(type='AREA')
-        bottom_light = bpy.context.active_object
-        bottom_light.name = "BottomLight"
-        bottom_light.location = (0, 0, 1)
-        bottom_light.rotation_euler = (3.14, 0, 0)  # Направлен вверх
-        bottom_light.data.energy = 0.8  # Очень низкая энергия
-        bottom_light.data.size = 30.0  # Большой размер для очень мягкого света
+        side_light2 = bpy.context.active_object
+        side_light2.name = "SideLight2"
+        side_light2.location = (10, 0, 5)
+        side_light2.rotation_euler = (0, -1.57, 0)  # Поворот на -90 градусов
+        side_light2.data.energy = 2.5  # Увеличиваем энергию для подсветки боковых поверхностей
+        side_light2.data.size = 15.0  # Большой размер для мягкости
+        
+        # Добавляем свет спереди для подсветки передних поверхностей
+        bpy.ops.object.light_add(type='AREA')
+        front_light = bpy.context.active_object
+        front_light.name = "FrontLight"
+        front_light.location = (0, -10, 5)
+        front_light.rotation_euler = (1.57, 0, 0)  # Направлен вперед
+        front_light.data.energy = 2.0  # Энергия для подсветки передних поверхностей
+        front_light.data.size = 15.0  # Большой размер для мягкости
         
         # Выделяем все объекты для рендера
         bpy.ops.object.select_all(action='DESELECT')
@@ -1332,16 +1518,29 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             else:
                 print("Текстура кирпича не найдена, внешние стены будут иметь стандартный материал")
         
-        # Предварительно определяем внешние стены
-        print("Определение внешних стен...")
-        external_wall_ids = detect_external_walls(
+        # Проверяем наличие контура здания в данных
+        if "building_outline" not in data:
+            print("Ошибка: в данных отсутствует контур здания (building_outline)")
+            return False
+        
+        building_outline = data["building_outline"]
+        outline_vertices = building_outline["vertices"]
+        print(f"Загружен контур здания с {len(outline_vertices)} вершинами")
+        
+        # Определяем внешние стены и проемы на основе контура
+        print("Определение внешних элементов по контуру...")
+        # Увеличиваем tolerance для лучшего определения внешних стен
+        tolerance_multiplier = 2.0  # Увеличиваем tolerance в 2 раза
+        external_wall_ids, external_opening_ids = mark_external_elements_by_outline(
             wall_segments_from_openings,
             wall_segments_from_junctions,
             openings,
-            pillars,
-            boundary_threshold=50.0  # Увеличиваем порог для максимального покрытия
+            outline_vertices,
+            wall_thickness * tolerance_multiplier,  # Увеличиваем tolerance
+            scale_factor
         )
         print(f"  Найдено внешних стен: {len(external_wall_ids)}")
+        print(f"  Найдено внешних проемов: {len(external_opening_ids)}")
         
         # Создаем стены из сегментов от проемов
         wall_objects = []
@@ -1351,6 +1550,12 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         for i, segment in enumerate(wall_segments_from_openings):
             # Проверяем, является ли стена внешней
             is_ext = is_external_wall(segment, external_wall_ids)
+            
+            # Выводим отладочную информацию
+            if is_ext:
+                print(f"  Внешняя стена {i+1}/{len(wall_segments_from_openings)}: {segment['segment_id']}")
+            else:
+                print(f"  Внутренняя стена {i+1}/{len(wall_segments_from_openings)}: {segment['segment_id']}")
             
             # Создаем стену с соответствующим материалом
             wall_obj = create_wall_mesh(segment, wall_height_meters, wall_thickness, scale_factor,
@@ -1365,9 +1570,15 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
                     wall_obj.name = f"Internal_Wall_{segment['segment_id']}"
         
         # Создаем стены из сегментов от соединений
-        for segment in wall_segments_from_junctions:
+        for i, segment in enumerate(wall_segments_from_junctions):
             # Проверяем, является ли стена внешней
             is_ext = is_external_wall(segment, external_wall_ids)
+            
+            # Выводим отладочную информацию
+            if is_ext:
+                print(f"  Внешняя стена соединения {i+1}/{len(wall_segments_from_junctions)}: {segment['segment_id']}")
+            else:
+                print(f"  Внутренняя стена соединения {i+1}/{len(wall_segments_from_junctions)}: {segment['segment_id']}")
             
             # Создаем стену с соответствующим материалом
             wall_obj = create_wall_mesh(segment, wall_height_meters, wall_thickness, scale_factor,
@@ -1401,12 +1612,24 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         # Создаем проемы как отдельные цветные объекты
         print("Создание проемов как отдельных объектов...")
         opening_objects = []
+        external_openings_count = 0
+        internal_openings_count = 0
+        
         for opening in openings:
-            opening_obj = create_opening_mesh(opening, wall_height_meters, wall_thickness, scale_factor)
+            is_ext = is_external_opening(opening, external_opening_ids)
+            opening_obj = create_opening_mesh(opening, wall_height_meters, wall_thickness, scale_factor, is_external=is_ext)
             if opening_obj:
                 opening_objects.append(opening_obj)
+                if is_ext:
+                    external_openings_count += 1
+                    opening_obj.name = f"External_{opening['type']}_{opening['id']}"
+                else:
+                    internal_openings_count += 1
+                    opening_obj.name = f"Internal_{opening['type']}_{opening['id']}"
         
         print(f"Создано проемов: {len(opening_objects)}/{len(openings)}")
+        print(f"Внешних проемов: {external_openings_count}")
+        print(f"Внутренних проемов: {internal_openings_count}")
         
         # Создаем колонны как отдельные цветные объекты
         print("Создание колонн как отдельных объектов...")
@@ -1461,6 +1684,30 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
                 if obj and obj.name in bpy.data.objects:
                     obj.select_set(True)
             
+            # Создаем контурную стену для отладки ПЕРЕД экспортом
+            outline_wall = None
+            try:
+                if data and "building_outline" in data:
+                    building_outline = data["building_outline"]
+                    outline_vertices = building_outline["vertices"]
+                    
+                    # Создаем контурную стену с увеличенной высотой для лучшей видимости
+                    outline_wall = create_outline_wall(outline_vertices, wall_height_meters + 1.0, scale_factor)
+                    if outline_wall:
+                        print(f"Контурная стена создана для отладки: {outline_wall.name}")
+                        print(f"Тип объекта: {outline_wall.type}")
+                        print(f"Количество вершин: {len(outline_wall.data.vertices)}")
+                        print(f"Количество полигонов: {len(outline_wall.data.polygons)}")
+                        print(f"Положение: {outline_wall.location}")
+                        
+                        # Добавляем контурную стену к выделению
+                        outline_wall.select_set(True)
+                        print("Контурная стена добавлена к экспорту")
+                    else:
+                        print("ОШИБКА: Контурная стена не создана")
+            except Exception as e:
+                print(f"Ошибка при создании контурной стены: {e}")
+            
             # Обновляем сцену перед экспортом
             bpy.context.view_layer.update()
             
@@ -1507,6 +1754,8 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         print(f"Внешних стен: {external_walls_count}")
         print(f"Внутренних стен: {internal_walls_count}")
         print(f"Создано проемов: {len(opening_objects)}")
+        print(f"Внешних проемов: {external_openings_count}")
+        print(f"Внутренних проемов: {internal_openings_count}")
         print(f"Создано колонн: {len(pillar_objects)}")
         print("=" * 60)
         
@@ -1515,6 +1764,115 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
     except Exception as e:
         print(f"Ошибка при создании 3D стен: {e}")
         return False
+
+def create_outline_wall(outline_vertices, wall_height, scale_factor=1.0):
+    """
+    Создает 3D стену на основе контура здания для визуальной отладки
+    
+    Args:
+        outline_vertices: вершины контура здания
+        wall_height: высота стены
+        scale_factor: масштабный коэффициент
+    
+    Returns:
+        bpy.types.Object: объект контурной стены
+    """
+    print(f"Создание контурной стены из {len(outline_vertices)} вершин")
+    print(f"Примеры координат контура: {outline_vertices[0]}, {outline_vertices[1] if len(outline_vertices) > 1 else 'N/A'}")
+    
+    # Создаем меш
+    bm = bmesh.new()
+    
+    # Создаем вершины для нижней грани
+    bottom_verts = []
+    for vertex in outline_vertices:
+        x = vertex["x"] * scale_factor
+        y = vertex["y"] * scale_factor
+        v = bm.verts.new((x, y, 0))
+        bottom_verts.append(v)
+        print(f"  Вершина: ({x:.3f}, {y:.3f}, 0.0)")
+    
+    # Создаем вершины для верхней грани
+    top_verts = []
+    for vertex in outline_vertices:
+        x = vertex["x"] * scale_factor
+        y = vertex["y"] * scale_factor
+        v = bm.verts.new((x, y, wall_height))
+        top_verts.append(v)
+    
+    # Создаем только боковые грани для стен (без верхних и нижних)
+    wall_faces = []
+    for i in range(len(outline_vertices)):
+        next_i = (i + 1) % len(outline_vertices)
+        
+        try:
+            # Боковая грань
+            face = bm.faces.new((
+                bottom_verts[i],
+                bottom_verts[next_i],
+                top_verts[next_i],
+                top_verts[i]
+            ))
+            wall_faces.append(face)
+            print(f"  Создана боковая грань {i+1}: {i} -> {next_i}")
+        except Exception as e:
+            print(f"  Ошибка при создании грани {i}: {e}")
+    
+    # Обновляем нормали
+    if wall_faces:
+        bmesh.ops.recalc_face_normals(bm, faces=wall_faces)
+    
+    # Создаем объект
+    mesh = bpy.data.meshes.new(name="Outline_Wall")
+    bm.to_mesh(mesh)
+    bm.free()
+    
+    obj = bpy.data.objects.new(mesh.name, mesh)
+    bpy.context.collection.objects.link(obj)
+    
+    # Создаем яркий желтый материал для контура
+    outline_mat = bpy.data.materials.new(name="OutlineMaterial")
+    outline_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+    outline_mat.use_nodes = True
+    
+    # Настраиваем материал для лучшей видимости
+    nodes = outline_mat.node_tree.nodes
+    links = outline_mat.node_tree.links
+    
+    # Очищаем стандартные узлы
+    nodes.clear()
+    
+    # Создаем основные узлы
+    output_node = nodes.new(type='ShaderNodeOutputMaterial')
+    principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    
+    # Настраиваем эмиссию для лучшей видимости
+    principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+    
+    # Проверяем наличие входов эмиссии (зависит от версии Blender)
+    if 'Emission' in principled_bsdf.inputs:
+        principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
+        if 'Emission Strength' in principled_bsdf.inputs:
+            principled_bsdf.inputs['Emission Strength'].default_value = 1.0  # Увеличиваем силу эмиссии
+    else:
+        # Если входа эмиссии нет, используем только базовый цвет
+        principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+        # Увеличиваем шероховатость для лучшей видимости
+        if 'Roughness' in principled_bsdf.inputs:
+            principled_bsdf.inputs['Roughness'].default_value = 0.8
+    
+    # Соединяем узлы
+    links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+    
+    # Применяем материал
+    if obj.data.materials:
+        obj.data.materials[0] = outline_mat
+    else:
+        obj.data.materials.append(outline_mat)
+    
+    print(f"Создана контурная стена: {len(wall_faces)} боковых граней из {len(outline_vertices)} вершин")
+    
+    return obj
 
 # Использование
 if __name__ == "__main__":
@@ -1529,3 +1887,26 @@ if __name__ == "__main__":
     # Также создаем изометрический рендер
     create_3d_walls_from_json(json_path, wall_height=3.0, export_obj=True,
                              brick_texture_path=brick_texture_path, render_isometric=True)
+    
+    # Дополнительно создаем контурную стену для отладки ПЕРЕД экспортом
+    outline_wall = None
+    try:
+        data = load_wall_coordinates(json_path)
+        if data and "building_outline" in data:
+            building_outline = data["building_outline"]
+            outline_vertices = building_outline["vertices"]
+            scale_factor = 0.01  # 1 пиксель = 0.01 метра
+            wall_height = 3.0
+            
+            # Создаем контурную стену с увеличенной высотой для лучшей видимости
+            outline_wall = create_outline_wall(outline_vertices, wall_height + 1.0, scale_factor)
+            if outline_wall:
+                print(f"Контурная стена создана для отладки: {outline_wall.name}")
+                print(f"Тип объекта: {outline_wall.type}")
+                print(f"Количество вершин: {len(outline_wall.data.vertices)}")
+                print(f"Количество полигонов: {len(outline_wall.data.polygons)}")
+                print(f"Положение: {outline_wall.location}")
+            else:
+                print("ОШИБКА: Контурная стена не создана")
+    except Exception as e:
+        print(f"Ошибка при создании контурной стены: {e}")
