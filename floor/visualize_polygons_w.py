@@ -112,10 +112,46 @@ def add_junction_to_json(json_data: Dict, junction: JunctionPoint) -> None:
         "junction_type": junction.junction_type,
         "detected_type": junction.detected_type,
         "directions": junction.directions,
-        "confidence": junction.confidence
+        "confidence": junction.confidence,
+        "connected_wall_segments": []  # Инициализация массива для привязки сегментов стен
     }
     json_data["junctions"].append(junction_data)
     json_data["statistics"]["total_junctions"] += 1
+
+def add_junction_wall_binding(json_data: Dict, junction_id: int, segment_id: str,
+                            segment_type: str, connection_type: str) -> None:
+    """
+    Добавляет привязку сегмента стены к junction
+    
+    Args:
+        json_data: JSON структура для сохранения данных
+        junction_id: ID junction
+        segment_id: ID сегмента стены
+        segment_type: Тип сегмента ('from_openings' или 'from_junctions')
+        connection_type: Тип подключения ('start' или 'end')
+    """
+    # Находим junction по ID
+    for junction in json_data["junctions"]:
+        if junction["id"] == junction_id:
+            # Проверяем, нет ли уже такой привязки
+            existing_binding = None
+            for binding in junction["connected_wall_segments"]:
+                if (binding["segment_id"] == segment_id and
+                    binding["segment_type"] == segment_type):
+                    existing_binding = binding
+                    break
+            
+            # Если привязка уже существует, обновляем её
+            if existing_binding:
+                existing_binding["connection_type"] = connection_type
+            else:
+                # Добавляем новую привязку
+                junction["connected_wall_segments"].append({
+                    "segment_id": segment_id,
+                    "segment_type": segment_type,
+                    "connection_type": connection_type
+                })
+            break
 
 def add_wall_segment_from_opening_to_json(json_data: Dict, segment: WallSegmentFromOpening) -> None:
     """Добавляет сегмент стены от проема в JSON структуру"""
@@ -131,6 +167,12 @@ def add_wall_segment_from_opening_to_json(json_data: Dict, segment: WallSegmentF
     }
     json_data["wall_segments_from_openings"].append(segment_data)
     json_data["statistics"]["total_wall_segments_from_openings"] += 1
+    
+    # Добавляем привязки к junctions
+    add_junction_wall_binding(json_data, segment.start_junction.id, segment.segment_id,
+                            "from_openings", "start")
+    add_junction_wall_binding(json_data, segment.end_junction.id, segment.segment_id,
+                            "from_openings", "end")
 
 def add_wall_segment_from_junction_to_json(json_data: Dict, segment: WallSegmentFromJunction) -> None:
     """Добавляет сегмент стены между junctions в JSON структуру"""
@@ -144,6 +186,52 @@ def add_wall_segment_from_junction_to_json(json_data: Dict, segment: WallSegment
     }
     json_data["wall_segments_from_junctions"].append(segment_data)
     json_data["statistics"]["total_wall_segments_from_junctions"] += 1
+    
+    # Добавляем привязки к junctions
+    add_junction_wall_binding(json_data, segment.start_junction.id, segment.segment_id,
+                            "from_junctions", "start")
+    add_junction_wall_binding(json_data, segment.end_junction.id, segment.segment_id,
+                            "from_junctions", "end")
+
+def update_existing_junctions_with_wall_bindings(json_data: Dict) -> None:
+    """
+    Обновляет существующие junctions привязками к сегментам стен
+    Вызывается после создания всех сегментов стен
+    
+    Args:
+        json_data: JSON структура с данными
+    """
+    print(f"  Обновление junctions привязками к сегментам стен...")
+    
+    # Проходим по всем сегментам стен из проемов
+    for segment in json_data["wall_segments_from_openings"]:
+        segment_id = segment["segment_id"]
+        start_junction_id = segment["start_junction_id"]
+        end_junction_id = segment["end_junction_id"]
+        
+        # Добавляем привязки для начального junction
+        add_junction_wall_binding(json_data, start_junction_id, segment_id,
+                                "from_openings", "start")
+        
+        # Добавляем привязки для конечного junction
+        add_junction_wall_binding(json_data, end_junction_id, segment_id,
+                                "from_openings", "end")
+    
+    # Проходим по всем сегментам стен из junctions
+    for segment in json_data["wall_segments_from_junctions"]:
+        segment_id = segment["segment_id"]
+        start_junction_id = segment["start_junction_id"]
+        end_junction_id = segment["end_junction_id"]
+        
+        # Добавляем привязки для начального junction
+        add_junction_wall_binding(json_data, start_junction_id, segment_id,
+                                "from_junctions", "start")
+        
+        # Добавляем привязки для конечного junction
+        add_junction_wall_binding(json_data, end_junction_id, segment_id,
+                                "from_junctions", "end")
+    
+    print(f"  ✓ Обновление junctions завершено")
 
 def add_opening_to_json(json_data: Dict, opening: Dict, edge_junctions: List[Tuple[str, JunctionPoint]]) -> None:
     """Добавляет проем в JSON структуру"""
@@ -2642,6 +2730,13 @@ def visualize_polygons_opening_based_with_junction_types():
         print(f"  ✓ Обновлен сегмент из junction: {segment.segment_id}")
     
     print(f"  ✓ JSON данные обновлены с {extended_count} расширенными сегментами")
+    
+    # Добавляем привязки junctions к стенам
+    print(f"\n{'='*60}")
+    print("ДОБАВЛЕНИЕ ПРИВЯЗОК JUNCTIONS К СТЕНАМ")
+    print(f"{'='*60}")
+    
+    update_existing_junctions_with_wall_bindings(json_data)
     
     # Выравнивание стен по проемам
     print(f"\n{'='*60}")

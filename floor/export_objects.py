@@ -2174,13 +2174,10 @@ def main():
         for polygon in pillar_polygons_hatching:
             json_data["pillar_polygons"].append(polygon)
 
-        # Export windows
+        # Export windows (без junctions пока)
         for i, window in enumerate(windows):
             x, y, w, h = window['bbox']
             wall_id = find_wall_for_opening(window, wall_segments)
-            
-            # Находим junctions для окна
-            window_junctions = find_junctions_for_opening(window, all_junctions, max_distance=50)
             
             window_data = {
                 "id": f"window_{i+1}",
@@ -2190,7 +2187,7 @@ def main():
                 "height": 1.5,
                 "sill_height": 1.0,
                 "methods": window['methods'],
-                "junctions": window_junctions  # Добавляем junctions
+                "junctions": {}  # Временно пусто, заполним после фильтрации junctions
             }
             
             # Add confidence values
@@ -2203,13 +2200,10 @@ def main():
             
             json_data["openings"].append(window_data)
 
-        # Export doors
+        # Export doors (без junctions пока)
         for i, door in enumerate(doors):
             x, y, w, h = door['bbox']
             wall_id = find_wall_for_opening(door, wall_segments)
-            
-            # Находим junctions для двери
-            door_junctions = find_junctions_for_opening(door, all_junctions, max_distance=50)
             
             door_data = {
                 "id": f"door_{i+1}",
@@ -2218,7 +2212,7 @@ def main():
                 "wall_id": f"wall_{wall_id+1}" if wall_id is not None else None,
                 "height": 2.1,
                 "methods": door['methods'],
-                "junctions": door_junctions  # Добавляем junctions
+                "junctions": {}  # Временно пусто, заполним после фильтрации junctions
             }
             
             # Add confidence values
@@ -2310,12 +2304,40 @@ def main():
                     
                     # Фильтруем junctions, оставляя только те внутри фундамента
                     original_junctions = json_data["junctions"].copy()
-                    json_data["junctions"] = filter_junctions_by_foundation(
+                    filtered_junctions = filter_junctions_by_foundation(
                         original_junctions,
                         json_data["foundation"]
                     )
                     
+                    # Создаем словарь соответствия старых ID новым индексам
+                    old_to_new_id_mapping = {}
+                    for new_idx, junction in enumerate(filtered_junctions, 1):
+                        if 'id' in junction:
+                            old_to_new_id_mapping[junction['id']] = new_idx
+                    
+                    # Обновляем ID junctions на новые последовательные ID
+                    for junction in filtered_junctions:
+                        if 'id' in junction:
+                            junction['id'] = old_to_new_id_mapping[junction['id']]
+                    
+                    json_data["junctions"] = filtered_junctions
+                    
                     print(f"   Junctions filtered: {len(original_junctions)} -> {len(json_data['junctions'])}")
+                    print(f"   ID mapping created: {len(old_to_new_id_mapping)} mappings")
+                    
+                    # Теперь добавляем junctions к проемам после фильтрации и перенумерации
+                    print("\n   Adding junctions to openings...")
+                    for opening in json_data["openings"]:
+                        if opening['type'] == 'window':
+                            original_window = next((w for w in windows if w['bbox'] == (opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height'])), None)
+                        else:  # door
+                            original_window = next((d for d in doors if d['bbox'] == (opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height'])), None)
+                        
+                        if original_window:
+                            opening_junctions = find_junctions_for_opening(original_window, json_data["junctions"], max_distance=50)
+                            opening['junctions'] = opening_junctions
+                    
+                    print(f"   Junctions added to {len(json_data['openings'])} openings")
                 else:
                     print("   Failed to create foundation polygon")
             else:

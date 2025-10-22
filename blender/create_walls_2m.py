@@ -136,6 +136,405 @@ def mark_external_elements_by_outline(wall_segments_from_openings, wall_segments
     
     return external_wall_ids, external_opening_ids
 
+def mark_external_walls_by_junctions(wall_segments_from_openings, wall_segments_from_junctions,
+                                   junctions, building_outline):
+    """
+    Определяет внешние стены на основе последовательности junctions из building_outline
+    
+    Args:
+        wall_segments_from_openings: список сегментов стен от проемов
+        wall_segments_from_junctions: список сегментов стен от соединений
+        junctions: список junctions
+        building_outline: контур здания с последовательностью junctions
+    
+    Returns:
+        set: множество ID внешних стен
+    """
+    external_wall_ids = set()
+    
+    # Получаем последовательность junction_id из building_outline
+    outline_junction_ids = []
+    for vertex in building_outline["vertices"]:
+        if "junction_id" in vertex:
+            outline_junction_ids.append(vertex["junction_id"])
+    
+    print(f"Последовательность junctions в контуре: {outline_junction_ids}")
+    
+    # Создаем словарь для быстрого доступа к junction по ID
+    junction_dict = {j["id"]: j for j in junctions}
+    
+    # Создаем множество всех пар junction_id, которые образуют внешний контур
+    outline_pairs = set()
+    for i in range(len(outline_junction_ids)):
+        current_junction_id = outline_junction_ids[i]
+        next_junction_id = outline_junction_ids[(i + 1) % len(outline_junction_ids)]
+        
+        # Добавляем обе направления пары
+        outline_pairs.add((current_junction_id, next_junction_id))
+        outline_pairs.add((next_junction_id, current_junction_id))
+    
+    print(f"Пары junctions внешнего контура: {outline_pairs}")
+    
+    # Проверяем сегменты стен от проемов
+    for segment in wall_segments_from_openings:
+        start_junction_id = segment.get("start_junction_id")
+        end_junction_id = segment.get("end_junction_id")
+        
+        if start_junction_id is not None and end_junction_id is not None:
+            # Проверяем, образует ли сегмент часть внешнего контура
+            if (start_junction_id, end_junction_id) in outline_pairs:
+                external_wall_ids.add(segment["segment_id"])
+                print(f"  Внешняя стена (проем): {segment['segment_id']} -> junctions {start_junction_id}-{end_junction_id}")
+    
+    # Проверяем сегменты стен от соединений
+    for segment in wall_segments_from_junctions:
+        start_junction_id = segment.get("start_junction_id")
+        end_junction_id = segment.get("end_junction_id")
+        
+        if start_junction_id is not None and end_junction_id is not None:
+            # Проверяем, образует ли сегмент часть внешнего контура
+            if (start_junction_id, end_junction_id) in outline_pairs:
+                external_wall_ids.add(segment["segment_id"])
+                print(f"  Внешняя стена (соединение): {segment['segment_id']} -> junctions {start_junction_id}-{end_junction_id}")
+    
+    print(f"Всего найдено внешних стен: {len(external_wall_ids)}")
+    return external_wall_ids
+
+def create_junction_labels(junctions, wall_segments_from_openings, wall_segments_from_junctions, scale_factor=1.0, wall_height=2.0):
+    """
+    Создает текстовые метки с номерами junctions в Blender относительно стен
+    
+    Args:
+        junctions: список junctions
+        wall_segments_from_openings: список сегментов стен от проемов
+        wall_segments_from_junctions: список сегментов стен от junctions
+        scale_factor: масштабный коэффициент
+        wall_height: высота стен для позиционирования меток
+    
+    Returns:
+        list: список объектов текстовых меток
+    """
+    label_objects = []
+    
+    # Проверяем доступность функции создания текста в Blender
+    try:
+        # Проверяем, доступен ли bpy
+        import bpy
+        
+        # Создаем словарь для быстрого поиска сегментов стен по ID
+        wall_segments = {}
+        
+        # Добавляем сегменты от проемов
+        for segment in wall_segments_from_openings:
+            wall_segments[segment["segment_id"]] = segment
+        
+        # Добавляем сегменты от junctions
+        for segment in wall_segments_from_junctions:
+            wall_segments[segment["segment_id"]] = segment
+        
+        for junction in junctions:
+            junction_id = junction["id"]
+            
+            # Ищем связанные сегменты стен
+            connected_segments = junction.get("connected_wall_segments", [])
+            
+            if not connected_segments:
+                print(f"Предупреждение: Junction {junction_id} не имеет связанных стен")
+                continue
+            
+            # Берем первый связанный сегмент для позиционирования
+            first_segment_id = connected_segments[0]["segment_id"]
+            
+            if first_segment_id not in wall_segments:
+                print(f"Предупреждение: Сегмент стены {first_segment_id} не найден для Junction {junction_id}")
+                continue
+            
+            segment = wall_segments[first_segment_id]
+            
+            # Определяем позицию для метки на основе сегмента стены
+            bbox = segment["bbox"]
+            
+            # Вычисляем центр сегмента стены
+            center_x = (bbox["x"] + bbox["width"] / 2) * scale_factor
+            center_y = (bbox["y"] + bbox["height"] / 2) * scale_factor
+            
+            # Если junction привязан к началу или концу сегмента, смещаем позицию
+            connection_type = connected_segments[0].get("connection_type", "")
+            if connection_type == "start":
+                # Смещаем к началу сегмента
+                offset_x = -bbox["width"] * scale_factor * 0.3
+                offset_y = -bbox["height"] * scale_factor * 0.3
+                center_x += offset_x
+                center_y += offset_y
+            elif connection_type == "end":
+                # Смещаем к концу сегмента
+                offset_x = bbox["width"] * scale_factor * 0.3
+                offset_y = bbox["height"] * scale_factor * 0.3
+                center_x += offset_x
+                center_y += offset_y
+            
+            # Создаем текстовый объект
+            bpy.ops.object.text_add(location=(center_x, center_y, wall_height + 0.5))
+            text_obj = bpy.context.active_object
+            text_obj.name = f"Junction_Label_{junction_id}"
+            
+            # Устанавливаем текст
+            text_obj.data.body = str(junction_id)
+            
+            # Настраиваем размер шрифта
+            text_obj.data.size = 0.3  # Размер шрифта
+            
+            # Центрируем текст
+            text_obj.data.align_x = 'CENTER'
+            text_obj.data.align_y = 'CENTER'
+            
+            # Создаем материал для текста
+            text_material = bpy.data.materials.new(name=f"JunctionLabelMaterial_{junction_id}")
+            text_material.diffuse_color = (1.0, 1.0, 1.0, 1.0)  # Белый цвет
+            text_material.use_nodes = True
+            
+            # Настраиваем материал для лучшей видимости
+            nodes = text_material.node_tree.nodes
+            links = text_material.node_tree.links
+            
+            # Очищаем стандартные узлы
+            nodes.clear()
+            
+            # Создаем основные узлы
+            output_node = nodes.new(type='ShaderNodeOutputMaterial')
+            principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+            
+            # Настраиваем эмиссию для лучшей видимости
+            principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 1.0, 1.0)  # Белый
+            
+            # Проверяем наличие входов эмиссии (зависит от версии Blender)
+            if 'Emission' in principled_bsdf.inputs:
+                principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 1.0, 1.0)  # Белая эмиссия
+                if 'Emission Strength' in principled_bsdf.inputs:
+                    principled_bsdf.inputs['Emission Strength'].default_value = 0.3  # Умеренная сила эмиссии
+            else:
+                # Если входа эмиссии нет, используем только базовый цвет
+                principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 1.0, 1.0)  # Белый
+                # Увеличиваем шероховатость для лучшей видимости
+                if 'Roughness' in principled_bsdf.inputs:
+                    principled_bsdf.inputs['Roughness'].default_value = 0.8
+            
+            # Соединяем узлы
+            links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+            
+            # Применяем материал
+            if text_obj.data.materials:
+                text_obj.data.materials[0] = text_material
+            else:
+                text_obj.data.materials.append(text_material)
+            
+            label_objects.append(text_obj)
+            
+        print(f"Создано {len(label_objects)} текстовых меток для junctions относительно стен")
+        return label_objects
+        
+    except ImportError:
+        print("Предупреждение: модуль bpy недоступен, создание текстовых меток невозможно")
+        return []
+    except Exception as e:
+        print(f"Ошибка при создании текстовых меток: {e}")
+        return []
+
+def build_outline_from_wall_connections(junctions, wall_segments_from_openings, wall_segments_from_junctions, building_outline, scale_factor=1.0):
+    """
+    Строит внешний контур здания на основе привязки junctions к стенам, используя порядок из building_outline
+    
+    Args:
+        junctions: список junctions
+        wall_segments_from_openings: список сегментов стен от проемов
+        wall_segments_from_junctions: список сегментов стен от junctions
+        building_outline: контур здания с порядком обхода junctions
+        scale_factor: масштабный коэффициент
+    
+    Returns:
+        list: список вершин внешнего контура в порядке обхода
+    """
+    try:
+        # Создаем словарь для быстрого поиска junctions по ID
+        junction_dict = {j["id"]: j for j in junctions}
+        
+        # Создаем словарь для быстрого поиска сегментов стен по ID
+        wall_segments = {}
+        
+        # Добавляем сегменты от проемов
+        for segment in wall_segments_from_openings:
+            wall_segments[segment["segment_id"]] = segment
+        
+        # Добавляем сегменты от junctions
+        for segment in wall_segments_from_junctions:
+            wall_segments[segment["segment_id"]] = segment
+        
+        # Получаем порядок junctions из building_outline
+        outline_junction_ids = []
+        for vertex in building_outline["vertices"]:
+            if "junction_id" in vertex:
+                outline_junction_ids.append(vertex["junction_id"])
+        
+        print(f"Порядок junctions из building_outline: {outline_junction_ids}")
+        
+        # Строим контур, следуя порядку junctions
+        outline_vertices = []
+        
+        for junction_id in outline_junction_ids:
+            if junction_id not in junction_dict:
+                print(f"Предупреждение: Junction {junction_id} не найден в junctions")
+                continue
+                
+            junction = junction_dict[junction_id]
+            
+            # Ищем связанные сегменты стен
+            connected_segments = junction.get("connected_wall_segments", [])
+            
+            if not connected_segments:
+                print(f"Предупреждение: Junction {junction_id} не имеет связанных стен")
+                # Используем координаты junction как запасной вариант
+                x = junction["x"] * scale_factor
+                y = junction["y"] * scale_factor
+                outline_vertices.append({
+                    "x": x,
+                    "y": y,
+                    "junction_id": junction_id,
+                    "junction_type": junction.get("junction_type", "unknown"),
+                    "position_source": "junction_coordinates"
+                })
+                continue
+            
+            # Берем первый связанный сегмент для позиционирования
+            first_segment_id = connected_segments[0]["segment_id"]
+            
+            if first_segment_id not in wall_segments:
+                print(f"Предупреждение: Сегмент стены {first_segment_id} не найден для Junction {junction_id}")
+                # Используем координаты junction как запасной вариант
+                x = junction["x"] * scale_factor
+                y = junction["y"] * scale_factor
+                outline_vertices.append({
+                    "x": x,
+                    "y": y,
+                    "junction_id": junction_id,
+                    "junction_type": junction.get("junction_type", "unknown"),
+                    "position_source": "junction_coordinates"
+                })
+                continue
+            
+            segment = wall_segments[first_segment_id]
+            
+            # Определяем позицию для метки на основе сегмента стены
+            bbox = segment["bbox"]
+            
+            # Вычисляем центр сегмента стены
+            center_x = (bbox["x"] + bbox["width"] / 2) * scale_factor
+            center_y = (bbox["y"] + bbox["height"] / 2) * scale_factor
+            
+            # Если junction привязан к началу или концу сегмента, смещаем позицию
+            connection_type = connected_segments[0].get("connection_type", "")
+            if connection_type == "start":
+                # Смещаем к началу сегмента
+                offset_x = -bbox["width"] * scale_factor * 0.3
+                offset_y = -bbox["height"] * scale_factor * 0.3
+                center_x += offset_x
+                center_y += offset_y
+            elif connection_type == "end":
+                # Смещаем к концу сегмента
+                offset_x = bbox["width"] * scale_factor * 0.3
+                offset_y = bbox["height"] * scale_factor * 0.3
+                center_x += offset_x
+                center_y += offset_y
+            
+            outline_vertices.append({
+                "x": center_x,
+                "y": center_y,
+                "junction_id": junction_id,
+                "junction_type": junction.get("junction_type", "unknown"),
+                "position_source": "wall_segment",
+                "segment_id": first_segment_id
+            })
+        
+        print(f"Построен внешний контур из {len(outline_vertices)} вершин на основе стен")
+        return outline_vertices
+        
+    except Exception as e:
+        print(f"Ошибка при построении внешнего контура: {e}")
+        return []
+
+def mark_external_walls_by_junctions_and_walls(junctions, wall_segments_from_openings, wall_segments_from_junctions, building_outline):
+    """
+    Определяет внешние стены на основе порядка junctions из building_outline и их привязок к стенам
+    
+    Args:
+        junctions: список junctions
+        wall_segments_from_openings: сегменты стен от проемов
+        wall_segments_from_junctions: сегменты стен от соединений
+        building_outline: контур здания с порядком junctions
+    
+    Returns:
+        set: множество ID внешних стен
+    """
+    external_wall_ids = set()
+    
+    # Создаем словарь для быстрого поиска junctions по ID
+    junction_dict = {j["id"]: j for j in junctions}
+    
+    # Создаем словарь для быстрого поиска сегментов стен по ID
+    wall_segments = {}
+    
+    # Добавляем сегменты от проемов
+    for segment in wall_segments_from_openings:
+        wall_segments[segment["segment_id"]] = segment
+    
+    # Добавляем сегменты от junctions
+    for segment in wall_segments_from_junctions:
+        wall_segments[segment["segment_id"]] = segment
+    
+    # Получаем порядок junctions из building_outline
+    outline_junction_ids = []
+    for vertex in building_outline["vertices"]:
+        if "junction_id" in vertex:
+            outline_junction_ids.append(vertex["junction_id"])
+    
+    print(f"Порядок junctions из building_outline: {outline_junction_ids}")
+    
+    # Создаем множество всех пар junction_id, которые образуют внешний контур
+    outline_pairs = set()
+    for i in range(len(outline_junction_ids)):
+        current_junction_id = outline_junction_ids[i]
+        next_junction_id = outline_junction_ids[(i + 1) % len(outline_junction_ids)]
+        
+        # Добавляем обе направления пары
+        outline_pairs.add((current_junction_id, next_junction_id))
+        outline_pairs.add((next_junction_id, current_junction_id))
+    
+    print(f"Пары junctions внешнего контура: {outline_pairs}")
+    
+    # Проверяем сегменты стен от проемов
+    for segment in wall_segments_from_openings:
+        start_junction_id = segment.get("start_junction_id")
+        end_junction_id = segment.get("end_junction_id")
+        
+        if start_junction_id is not None and end_junction_id is not None:
+            # Проверяем, образует ли сегмент часть внешнего контура
+            if (start_junction_id, end_junction_id) in outline_pairs:
+                external_wall_ids.add(segment["segment_id"])
+                print(f"  Внешняя стена (проем): {segment['segment_id']} -> junctions {start_junction_id}-{end_junction_id}")
+    
+    # Проверяем сегменты стен от соединений
+    for segment in wall_segments_from_junctions:
+        start_junction_id = segment.get("start_junction_id")
+        end_junction_id = segment.get("end_junction_id")
+        
+        if start_junction_id is not None and end_junction_id is not None:
+            # Проверяем, образует ли сегмент часть внешнего контура
+            if (start_junction_id, end_junction_id) in outline_pairs:
+                external_wall_ids.add(segment["segment_id"])
+                print(f"  Внешняя стена (соединение): {segment['segment_id']} -> junctions {start_junction_id}-{end_junction_id}")
+    
+    print(f"Всего найдено внешних стен: {len(external_wall_ids)}")
+    return external_wall_ids
+
 def is_external_wall(segment_data, external_wall_ids):
     """
     Определяет, является ли стена внешней на основе предварительно вычисленных ID
@@ -506,11 +905,40 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     bpy.context.collection.objects.link(obj)
     
     # Применяем материал в зависимости от типа стены
-    if is_external and brick_material:
+    if is_external:
         # Внешняя стена с желтым цветом для визуальной проверки
-        # Временно заменяем текстуру на желтый цвет
-        yellow_mat = bpy.data.materials.new(name="ExternalWallDebug")
+        yellow_mat = bpy.data.materials.new(name="ExternalWallMaterial")
         yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+        yellow_mat.use_nodes = True
+        
+        # Настраиваем материал для лучшей видимости
+        nodes = yellow_mat.node_tree.nodes
+        links = yellow_mat.node_tree.links
+        
+        # Очищаем стандартные узлы
+        nodes.clear()
+        
+        # Создаем основные узлы
+        output_node = nodes.new(type='ShaderNodeOutputMaterial')
+        principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+        
+        # Настраиваем эмиссию для лучшей видимости
+        principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+        
+        # Проверяем наличие входов эмиссии (зависит от версии Blender)
+        if 'Emission' in principled_bsdf.inputs:
+            principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
+            if 'Emission Strength' in principled_bsdf.inputs:
+                principled_bsdf.inputs['Emission Strength'].default_value = 0.5  # Умеренная сила эмиссии
+        else:
+            # Если входа эмиссии нет, используем только базовый цвет
+            principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+            # Увеличиваем шероховатость для лучшей видимости
+            if 'Roughness' in principled_bsdf.inputs:
+                principled_bsdf.inputs['Roughness'].default_value = 0.8
+        
+        # Соединяем узлы
+        links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
         
         if obj.data.materials:
             obj.data.materials[0] = yellow_mat
@@ -520,7 +948,7 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
         print(f"    ВНЕШНЯЯ СТЕНА (отмечена желтым): {segment_data['segment_id']}")
     else:
         # Внутренняя стена или стандартный материал
-        mat = bpy.data.materials.new(name="WallMaterial")
+        mat = bpy.data.materials.new(name="InternalWallMaterial")
         mat.diffuse_color = (0.8, 0.8, 0.8, 1.0)  # Светло-серый
         
         if obj.data.materials:
@@ -1436,7 +1864,7 @@ def setup_isometric_camera_and_render(output_path="isometric_view.jpg"):
         traceback.print_exc()
         return False
 
-def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear_scene=True, brick_texture_path=None, render_isometric=False):
+def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear_scene=True, brick_texture_path=None, render_isometric=False, show_junction_labels=True):
     """
     Основная функция для создания 3D стен из JSON файла
     
@@ -1447,6 +1875,7 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         clear_scene (bool): Очищать сцену перед созданием стен (по умолчанию True)
         brick_texture_path (str): Путь к файлу текстуры кирпича для внешних стен
         render_isometric (bool): Создавать изометрический рендер (по умолчанию False)
+        show_junction_labels (bool): Отображать номера junctions над стенами (по умолчанию True)
     
     Returns:
         bool: True если успешно, False в случае ошибки
@@ -1527,11 +1956,30 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         outline_vertices = building_outline["vertices"]
         print(f"Загружен контур здания с {len(outline_vertices)} вершинами")
         
-        # Определяем внешние стены и проемы на основе контура
-        print("Определение внешних элементов по контуру...")
-        # Увеличиваем tolerance для лучшего определения внешних стен
+        # Строим внешний контур на основе привязки junctions к стенам
+        print("Построение внешнего контура на основе привязки junctions к стенам...")
+        wall_based_outline = build_outline_from_wall_connections(
+            junctions,
+            wall_segments_from_openings,
+            wall_segments_from_junctions,
+            building_outline,
+            scale_factor
+        )
+        
+        # Определяем внешние стены на основе порядка junctions и их привязок к стенам
+        print("Определение внешних стен на основе порядка junctions и их привязок к стенам...")
+        external_wall_ids = mark_external_walls_by_junctions_and_walls(
+            junctions,
+            wall_segments_from_openings,
+            wall_segments_from_junctions,
+            building_outline
+        )
+        print(f"  Найдено внешних стен: {len(external_wall_ids)}")
+        
+        # Дополнительно определяем внешние проемы на основе контура (для совместимости)
+        print("Определение внешних проемов по контуру...")
         tolerance_multiplier = 2.0  # Увеличиваем tolerance в 2 раза
-        external_wall_ids, external_opening_ids = mark_external_elements_by_outline(
+        _, external_opening_ids = mark_external_elements_by_outline(
             wall_segments_from_openings,
             wall_segments_from_junctions,
             openings,
@@ -1539,7 +1987,6 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             wall_thickness * tolerance_multiplier,  # Увеличиваем tolerance
             scale_factor
         )
-        print(f"  Найдено внешних стен: {len(external_wall_ids)}")
         print(f"  Найдено внешних проемов: {len(external_opening_ids)}")
         
         # Создаем стены из сегментов от проемов
@@ -1641,6 +2088,14 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         
         print(f"Создано колонн: {len(pillar_objects)}/{len(pillars)}")
         
+        # Создаем метки с номерами junctions если включено
+        if show_junction_labels:
+            print("Создание меток с номерами junctions...")
+            junction_label_objects = create_junction_labels(junctions, wall_segments_from_openings, wall_segments_from_junctions, scale_factor, wall_height_meters)
+            print(f"Создано меток junctions: {len(junction_label_objects)}")
+        else:
+            print("Отображение номеров junctions отключено")
+        
         # Инвертируем X-координаты всех объектов если нужно
         if invert_x:
             print("Инверсия X-координат...")
@@ -1683,30 +2138,6 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             for obj in pillar_objects:
                 if obj and obj.name in bpy.data.objects:
                     obj.select_set(True)
-            
-            # Создаем контурную стену для отладки ПЕРЕД экспортом
-            outline_wall = None
-            try:
-                if data and "building_outline" in data:
-                    building_outline = data["building_outline"]
-                    outline_vertices = building_outline["vertices"]
-                    
-                    # Создаем контурную стену с увеличенной высотой для лучшей видимости
-                    outline_wall = create_outline_wall(outline_vertices, wall_height_meters + 1.0, scale_factor)
-                    if outline_wall:
-                        print(f"Контурная стена создана для отладки: {outline_wall.name}")
-                        print(f"Тип объекта: {outline_wall.type}")
-                        print(f"Количество вершин: {len(outline_wall.data.vertices)}")
-                        print(f"Количество полигонов: {len(outline_wall.data.polygons)}")
-                        print(f"Положение: {outline_wall.location}")
-                        
-                        # Добавляем контурную стену к выделению
-                        outline_wall.select_set(True)
-                        print("Контурная стена добавлена к экспорту")
-                    else:
-                        print("ОШИБКА: Контурная стена не создана")
-            except Exception as e:
-                print(f"Ошибка при создании контурной стены: {e}")
             
             # Обновляем сцену перед экспортом
             bpy.context.view_layer.update()
@@ -1765,114 +2196,6 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         print(f"Ошибка при создании 3D стен: {e}")
         return False
 
-def create_outline_wall(outline_vertices, wall_height, scale_factor=1.0):
-    """
-    Создает 3D стену на основе контура здания для визуальной отладки
-    
-    Args:
-        outline_vertices: вершины контура здания
-        wall_height: высота стены
-        scale_factor: масштабный коэффициент
-    
-    Returns:
-        bpy.types.Object: объект контурной стены
-    """
-    print(f"Создание контурной стены из {len(outline_vertices)} вершин")
-    print(f"Примеры координат контура: {outline_vertices[0]}, {outline_vertices[1] if len(outline_vertices) > 1 else 'N/A'}")
-    
-    # Создаем меш
-    bm = bmesh.new()
-    
-    # Создаем вершины для нижней грани
-    bottom_verts = []
-    for vertex in outline_vertices:
-        x = vertex["x"] * scale_factor
-        y = vertex["y"] * scale_factor
-        v = bm.verts.new((x, y, 0))
-        bottom_verts.append(v)
-        print(f"  Вершина: ({x:.3f}, {y:.3f}, 0.0)")
-    
-    # Создаем вершины для верхней грани
-    top_verts = []
-    for vertex in outline_vertices:
-        x = vertex["x"] * scale_factor
-        y = vertex["y"] * scale_factor
-        v = bm.verts.new((x, y, wall_height))
-        top_verts.append(v)
-    
-    # Создаем только боковые грани для стен (без верхних и нижних)
-    wall_faces = []
-    for i in range(len(outline_vertices)):
-        next_i = (i + 1) % len(outline_vertices)
-        
-        try:
-            # Боковая грань
-            face = bm.faces.new((
-                bottom_verts[i],
-                bottom_verts[next_i],
-                top_verts[next_i],
-                top_verts[i]
-            ))
-            wall_faces.append(face)
-            print(f"  Создана боковая грань {i+1}: {i} -> {next_i}")
-        except Exception as e:
-            print(f"  Ошибка при создании грани {i}: {e}")
-    
-    # Обновляем нормали
-    if wall_faces:
-        bmesh.ops.recalc_face_normals(bm, faces=wall_faces)
-    
-    # Создаем объект
-    mesh = bpy.data.meshes.new(name="Outline_Wall")
-    bm.to_mesh(mesh)
-    bm.free()
-    
-    obj = bpy.data.objects.new(mesh.name, mesh)
-    bpy.context.collection.objects.link(obj)
-    
-    # Создаем яркий желтый материал для контура
-    outline_mat = bpy.data.materials.new(name="OutlineMaterial")
-    outline_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-    outline_mat.use_nodes = True
-    
-    # Настраиваем материал для лучшей видимости
-    nodes = outline_mat.node_tree.nodes
-    links = outline_mat.node_tree.links
-    
-    # Очищаем стандартные узлы
-    nodes.clear()
-    
-    # Создаем основные узлы
-    output_node = nodes.new(type='ShaderNodeOutputMaterial')
-    principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-    
-    # Настраиваем эмиссию для лучшей видимости
-    principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-    
-    # Проверяем наличие входов эмиссии (зависит от версии Blender)
-    if 'Emission' in principled_bsdf.inputs:
-        principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
-        if 'Emission Strength' in principled_bsdf.inputs:
-            principled_bsdf.inputs['Emission Strength'].default_value = 1.0  # Увеличиваем силу эмиссии
-    else:
-        # Если входа эмиссии нет, используем только базовый цвет
-        principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-        # Увеличиваем шероховатость для лучшей видимости
-        if 'Roughness' in principled_bsdf.inputs:
-            principled_bsdf.inputs['Roughness'].default_value = 0.8
-    
-    # Соединяем узлы
-    links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
-    
-    # Применяем материал
-    if obj.data.materials:
-        obj.data.materials[0] = outline_mat
-    else:
-        obj.data.materials.append(outline_mat)
-    
-    print(f"Создана контурная стена: {len(wall_faces)} боковых граней из {len(outline_vertices)} вершин")
-    
-    return obj
 
 # Использование
 if __name__ == "__main__":
@@ -1884,29 +2207,8 @@ if __name__ == "__main__":
     brick_texture_path = os.path.join(script_dir, "brick_texture.jpg")
     
     # Создаем 3D стены с указанной высотой и текстурой кирпича для внешних стен
-    # Также создаем изометрический рендер
+    # Также создаем изометрический рендер и отображаем номера junctions
     create_3d_walls_from_json(json_path, wall_height=3.0, export_obj=True,
-                             brick_texture_path=brick_texture_path, render_isometric=True)
+                             brick_texture_path=brick_texture_path, render_isometric=True,
+                             show_junction_labels=True)
     
-    # Дополнительно создаем контурную стену для отладки ПЕРЕД экспортом
-    outline_wall = None
-    try:
-        data = load_wall_coordinates(json_path)
-        if data and "building_outline" in data:
-            building_outline = data["building_outline"]
-            outline_vertices = building_outline["vertices"]
-            scale_factor = 0.01  # 1 пиксель = 0.01 метра
-            wall_height = 3.0
-            
-            # Создаем контурную стену с увеличенной высотой для лучшей видимости
-            outline_wall = create_outline_wall(outline_vertices, wall_height + 1.0, scale_factor)
-            if outline_wall:
-                print(f"Контурная стена создана для отладки: {outline_wall.name}")
-                print(f"Тип объекта: {outline_wall.type}")
-                print(f"Количество вершин: {len(outline_wall.data.vertices)}")
-                print(f"Количество полигонов: {len(outline_wall.data.polygons)}")
-                print(f"Положение: {outline_wall.location}")
-            else:
-                print("ОШИБКА: Контурная стена не создана")
-    except Exception as e:
-        print(f"Ошибка при создании контурной стены: {e}")
