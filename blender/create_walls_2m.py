@@ -4,6 +4,7 @@ import json
 import os
 from mathutils import Vector, Matrix
 import random
+from mathutils import Vector
 
 def point_to_line_distance(point, line_start, line_end):
     """
@@ -561,6 +562,409 @@ def is_external_opening(opening_data, external_opening_ids):
     """
     return opening_data["id"] in external_opening_ids
 
+def determine_turn_direction(prev_junction, current_junction, next_junction):
+    """
+    Определяет направление поворота между тремя последовательными junctions
+    
+    Args:
+        prev_junction: предыдущий junction
+        current_junction: текущий junction
+        next_junction: следующий junction
+    
+    Returns:
+        str: "left", "right" или "straight"
+    """
+    # Векторы движения
+    v1 = (current_junction["x"] - prev_junction["x"],
+          current_junction["y"] - prev_junction["y"])
+    v2 = (next_junction["x"] - current_junction["x"],
+          next_junction["y"] - current_junction["y"])
+    
+    # Векторное произведение (z-компонента для 2D)
+    cross_product = v1[0] * v2[1] - v1[1] * v2[0]
+    
+    if cross_product > 0:
+        return "left"  # Поворот налево
+    elif cross_product < 0:
+        return "right"  # Поворот направо
+    else:
+        return "straight"  # Прямое движение
+
+def determine_external_side(direction_vector, turn_direction, previous_external_side):
+    """
+    Определяет, какая сторона стены является уличной
+    
+    Args:
+        direction_vector: вектор направления движения (dx, dy)
+        turn_direction: направление поворота ("left", "right", "straight")
+        previous_external_side: предыдущее определение уличной стороны
+    
+    Returns:
+        str: "left", "right" или None
+    """
+    if turn_direction == "left":
+        # После поворота налево уличная сторона справа
+        return "right"
+    elif turn_direction == "right":
+        # После поворота направо уличная сторона слева
+        return "left"
+    else:  # straight
+        # При прямом движении сохраняем предыдущее определение
+        return previous_external_side
+
+def find_wall_segment_between_junctions(start_junction_id, end_junction_id, wall_segments):
+    """
+    Ищет сегмент стены между двумя junctions
+    """
+    for segment_id, segment in wall_segments.items():
+        start_id = segment.get("start_junction_id")
+        end_id = segment.get("end_junction_id")
+        
+        if (start_id == start_junction_id and end_id == end_junction_id) or \
+           (start_id == end_junction_id and end_id == start_junction_id):
+            return segment_id
+    
+    return None
+
+def assign_external_side_to_wall_segment(wall_segment, external_side, direction_vector):
+    """
+    Определяет, какая сторона конкретного сегмента стены является уличной
+    
+    Важно: правильно определяем нормали для уличной стороны
+    """
+    orientation = wall_segment.get("orientation", "horizontal")
+    
+    if orientation == "horizontal":
+        # Для горизонтальной стены
+        # Если направление движения вправо (dx > 0):
+        #   - external_side = "right" означает уличную сторону вперед (положительная Y)
+        #   - external_side = "left" означает уличную сторону назад (отрицательная Y)
+        # Если направление движения влево (dx < 0):
+        #   - external_side = "right" означает уличную сторону назад (отрицательная Y)
+        #   - external_side = "left" означает уличную сторону вперед (положительная Y)
+        
+        if direction_vector[0] > 0:  # Движение вправо
+            if external_side == "right":
+                return {"face": "front", "normal_direction": (0, 1, 0)}  # Положительная Y
+            else:
+                return {"face": "back", "normal_direction": (0, -1, 0)}  # Отрицательная Y
+        else:  # Движение влево
+            if external_side == "right":
+                return {"face": "back", "normal_direction": (0, -1, 0)}  # Отрицательная Y
+            else:
+                return {"face": "front", "normal_direction": (0, 1, 0)}  # Положительная Y
+    else:  # vertical
+        # Для вертикальной стены
+        # Если направление движения вверх (dy > 0):
+        #   - external_side = "right" означает уличную сторону вправо (положительная X)
+        #   - external_side = "left" означает уличную сторону влево (отрицательная X)
+        # Если направление движения вниз (dy < 0):
+        #   - external_side = "right" означает уличную сторону влево (отрицательная X)
+        #   - external_side = "left" означает уличную сторону вправо (положительная X)
+        
+        if direction_vector[1] > 0:  # Движение вверх
+            if external_side == "right":
+                return {"face": "right", "normal_direction": (1, 0, 0)}  # Положительная X
+            else:
+                return {"face": "left", "normal_direction": (-1, 0, 0)}  # Отрицательная X
+        else:  # Движение вниз
+            if external_side == "right":
+                return {"face": "left", "normal_direction": (-1, 0, 0)}  # Отрицательная X
+            else:
+                return {"face": "right", "normal_direction": (1, 0, 0)}  # Положительная X
+
+def determine_external_sides_by_street_point(junctions, wall_segments_from_openings,
+                                           wall_segments_from_junctions, building_outline, street_data):
+    """
+    Определяет уличные стороны на основе street_point из JSON
+    
+    Args:
+        junctions: список junctions
+        wall_segments_from_openings: сегменты стен от проемов
+        wall_segments_from_junctions: сегменты стен от соединений
+        building_outline: контур здания
+        street_data: данные о улице из JSON
+    
+    Returns:
+        dict: словарь с информацией об уличных сторонах для каждого сегмента стены
+    """
+    # Создаем словари для быстрого доступа
+    junction_dict = {j["id"]: j for j in junctions}
+    
+    # Объединяем все сегменты стен
+    all_wall_segments = {}
+    for segment in wall_segments_from_openings:
+        all_wall_segments[segment["segment_id"]] = segment
+    for segment in wall_segments_from_junctions:
+        all_wall_segments[segment["segment_id"]] = segment
+    
+    # Получаем порядок junctions из building_outline
+    outline_junction_ids = []
+    for vertex in building_outline["vertices"]:
+        if "junction_id" in vertex:
+            outline_junction_ids.append(vertex["junction_id"])
+    
+    # Находим индекс junction, связанного с улицей
+    street_junction_id = int(street_data["junction_id"])
+    street_junction_index = None
+    
+    for i, j_id in enumerate(outline_junction_ids):
+        if j_id == street_junction_id:
+            street_junction_index = i
+            break
+    
+    if street_junction_index is None:
+        print(f"Ошибка: junction с ID {street_junction_id} не найден в контуре здания")
+        return {}
+    
+    # Определяем направление обхода (против часовой стрелки)
+    # street_point находится снаружи здания, home_point - внутри
+    # Проверяем, где находится street_point относительно направления движения
+    street_point = street_data["street_point"]
+    home_point = street_data["home_point"]
+    street_junction = junction_dict[street_junction_id]
+    
+    # Получаем следующий junction в контуре
+    next_junction_index = (street_junction_index + 1) % len(outline_junction_ids)
+    next_junction_id = outline_junction_ids[next_junction_index]
+    next_junction = junction_dict[next_junction_id]
+    
+    # Определяем вектор направления движения
+    direction_vector = (next_junction["x"] - street_junction["x"],
+                       next_junction["y"] - street_junction["y"])
+    
+    # Определяем, где находится улица относительно направления движения
+    # Используем векторное произведение для определения положения точки
+    to_street_vector = (street_point["x"] - street_junction["x"],
+                       street_point["y"] - street_junction["y"])
+    
+    # Векторное произведение (z-компонента для 2D)
+    cross_product = direction_vector[0] * to_street_vector[1] - direction_vector[1] * to_street_vector[0]
+    
+    # Если cross_product > 0, улица слева от направления движения
+    # Если cross_product < 0, улица справа от направления движения
+    external_side = "left" if cross_product > 0 else "right"
+    
+    print(f"Улица находится {'слева' if external_side == 'left' else 'справа'} от направления движения")
+    print(f"Junction {street_junction_id} -> Junction {next_junction_id}")
+    print(f"Направление движения: {direction_vector}")
+    print(f"Вектор к улице: {to_street_vector}")
+    print(f"Векторное произведение: {cross_product}")
+    
+    # Результаты
+    external_side_info = {}
+    current_external_side = external_side
+    
+    # Обходим контур и определяем уличные стороны
+    for i in range(len(outline_junction_ids)):
+        current_junction_id = outline_junction_ids[i]
+        next_junction_id = outline_junction_ids[(i + 1) % len(outline_junction_ids)]
+        
+        # Получаем junctions
+        current_junction = junction_dict.get(current_junction_id)
+        next_junction = junction_dict.get(next_junction_id)
+        
+        if not current_junction or not next_junction:
+            continue
+        
+        # Определяем направление движения
+        direction_vector = (next_junction["x"] - current_junction["x"],
+                           next_junction["y"] - current_junction["y"])
+        
+        # Определяем тип поворота
+        if i > 0:
+            prev_junction_id = outline_junction_ids[i-1]
+            prev_junction = junction_dict.get(prev_junction_id)
+            
+            if prev_junction:
+                turn_direction = determine_turn_direction(prev_junction, current_junction, next_junction)
+                current_external_side = determine_external_side(direction_vector, turn_direction, current_external_side)
+        else:
+            # Для первого сегмента используем определенную сторону
+            current_external_side = external_side
+        
+        # Ищем сегмент стены между текущими junctions
+        segment_id = find_wall_segment_between_junctions(
+            current_junction_id, next_junction_id, all_wall_segments
+        )
+        
+        if segment_id and current_external_side:
+            # Определяем, какая сторона сегмента является уличной
+            external_face_info = assign_external_side_to_wall_segment(
+                all_wall_segments[segment_id], current_external_side, direction_vector
+            )
+            
+            external_side_info[segment_id] = {
+                "external_side": current_external_side,
+                "face": external_face_info["face"],
+                "normal_direction": external_face_info["normal_direction"],
+                "junction_start_id": current_junction_id,
+                "junction_end_id": next_junction_id
+            }
+    
+    return external_side_info
+
+
+def determine_external_sides_by_contour_traversal(junctions, wall_segments_from_openings,
+                                                 wall_segments_from_junctions, building_outline):
+    """
+    Основная функция для определения уличных сторон на основе обхода контура
+    
+    Args:
+        junctions: список junctions
+        wall_segments_from_openings: сегменты стен от проемов
+        wall_segments_from_junctions: сегменты стен от соединений
+        building_outline: контур здания
+    
+    Returns:
+        dict: словарь с информацией об уличных сторонах для каждого сегмента стены
+    """
+    # Создаем словари для быстрого доступа
+    junction_dict = {j["id"]: j for j in junctions}
+    
+    # Объединяем все сегменты стен
+    all_wall_segments = {}
+    for segment in wall_segments_from_openings:
+        all_wall_segments[segment["segment_id"]] = segment
+    for segment in wall_segments_from_junctions:
+        all_wall_segments[segment["segment_id"]] = segment
+    
+    # Получаем порядок junctions из building_outline
+    outline_junction_ids = []
+    for vertex in building_outline["vertices"]:
+        if "junction_id" in vertex:
+            outline_junction_ids.append(vertex["junction_id"])
+    
+    # Результаты
+    external_side_info = {}
+    previous_external_side = None
+    
+    # Обходим контур и определяем уличные стороны
+    for i in range(len(outline_junction_ids)):
+        current_junction_id = outline_junction_ids[i]
+        next_junction_id = outline_junction_ids[(i + 1) % len(outline_junction_ids)]
+        
+        # Получаем junctions
+        current_junction = junction_dict.get(current_junction_id)
+        next_junction = junction_dict.get(next_junction_id)
+        
+        if not current_junction or not next_junction:
+            continue
+        
+        # Определяем направление движения
+        direction_vector = (next_junction["x"] - current_junction["x"],
+                           next_junction["y"] - current_junction["y"])
+        
+        # Определяем тип поворота
+        if i > 0:
+            prev_junction_id = outline_junction_ids[i-1]
+            prev_junction = junction_dict.get(prev_junction_id)
+            
+            if prev_junction:
+                turn_direction = determine_turn_direction(prev_junction, current_junction, next_junction)
+                previous_external_side = determine_external_side(direction_vector, turn_direction, previous_external_side)
+        else:
+            # Для первого сегмента определяем начальную уличную сторону
+            # Предполагаем, что обход контура идет по часовой стрелке
+            # Тогда уличная сторона всегда справа от направления движения
+            previous_external_side = "right"
+        
+        # Ищем сегмент стены между текущими junctions
+        segment_id = find_wall_segment_between_junctions(
+            current_junction_id, next_junction_id, all_wall_segments
+        )
+        
+        if segment_id and previous_external_side:
+            # Определяем, какая сторона сегмента является уличной
+            external_face_info = assign_external_side_to_wall_segment(
+                all_wall_segments[segment_id], previous_external_side, direction_vector
+            )
+            
+            external_side_info[segment_id] = {
+                "external_side": previous_external_side,
+                "face": external_face_info["face"],
+                "normal_direction": external_face_info["normal_direction"],
+                "junction_start_id": current_junction_id,
+                "junction_end_id": next_junction_id
+            }
+    
+    return external_side_info
+
+def setup_material_emission(material, color):
+    """
+    Настраивает эмиссию для материала
+    """
+    if not material.use_nodes:
+        material.use_nodes = True
+    
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    
+    # Очищаем стандартные узлы
+    nodes.clear()
+    
+    # Создаем основные узлы
+    output_node = nodes.new(type='ShaderNodeOutputMaterial')
+    principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    
+    # Настраиваем эмиссию
+    principled_bsdf.inputs['Base Color'].default_value = color
+    
+    if 'Emission' in principled_bsdf.inputs:
+        principled_bsdf.inputs['Emission'].default_value = color
+        if 'Emission Strength' in principled_bsdf.inputs:
+            principled_bsdf.inputs['Emission Strength'].default_value = 0.5
+    
+    # Соединяем узлы
+    links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+
+def apply_external_side_material(wall_obj, external_side_info, wall_height):
+    """
+    Применяет желтый материал ко всей внешней стороне стены
+    
+    Важно: все поверхности между поворотами должны иметь одинаковое определение (уличные или внутренние)
+    """
+    # Создаем материалы
+    yellow_mat = bpy.data.materials.new(name="ExternalSideMaterial")
+    yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+    yellow_mat.use_nodes = True
+    
+    gray_mat = bpy.data.materials.new(name="InternalSideMaterial")
+    gray_mat.diffuse_color = (0.8, 0.8, 0.8, 1.0)  # Светло-серый
+    gray_mat.use_nodes = True
+    
+    # Настраиваем материалы для лучшей видимости
+    setup_material_emission(yellow_mat, (1.0, 1.0, 0.0, 1.0))
+    setup_material_emission(gray_mat, (0.8, 0.8, 0.8, 1.0))
+    
+    # Получаем меш
+    mesh = wall_obj.data
+    # В Blender 4.x нормали вычисляются автоматически, нет необходимости вызывать calc_normals()
+    
+    # Определяем, какая сторона является уличной (вся поверхность)
+    target_normal = Vector(external_side_info["normal_direction"])
+    target_normal.normalize()
+    
+    # Применяем материалы к соответствующим граням
+    for face in mesh.polygons:
+        # Определяем, является ли грань уличной
+        face_normal = face.normal.copy()
+        face_normal.normalize()
+        
+        # Проверяем, является ли грань уличной (с учетом погрешности)
+        dot_product = face_normal.dot(target_normal)
+        is_external_face = dot_product > 0.7  # Порог для определения уличной грани
+        
+        # Применяем соответствующий материал
+        if is_external_face:
+            face.material_index = 0  # Желтый материал
+        else:
+            face.material_index = 1  # Серый материал
+    
+    # Применяем материалы к объекту
+    wall_obj.data.materials.append(yellow_mat)
+    wall_obj.data.materials.append(gray_mat)
+
 def load_brick_texture(texture_path="brick_texture.jpg"):
     """
     Загружает текстуру кирпича и создает материал для внешних стен
@@ -764,7 +1168,7 @@ def get_junction_by_id(junctions, junction_id):
             return junction
     return None
 
-def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False, brick_material=None):
+def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False, brick_material=None, external_side_info=None):
     """
     Создает 3D меш для сегмента стены на основе bbox данных
     
@@ -906,46 +1310,51 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     
     # Применяем материал в зависимости от типа стены
     if is_external:
-        # Внешняя стена с желтым цветом для визуальной проверки
-        yellow_mat = bpy.data.materials.new(name="ExternalWallMaterial")
-        yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-        yellow_mat.use_nodes = True
-        
-        # Настраиваем материал для лучшей видимости
-        nodes = yellow_mat.node_tree.nodes
-        links = yellow_mat.node_tree.links
-        
-        # Очищаем стандартные узлы
-        nodes.clear()
-        
-        # Создаем основные узлы
-        output_node = nodes.new(type='ShaderNodeOutputMaterial')
-        principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-        
-        # Настраиваем эмиссию для лучшей видимости
-        principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-        
-        # Проверяем наличие входов эмиссии (зависит от версии Blender)
-        if 'Emission' in principled_bsdf.inputs:
-            principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
-            if 'Emission Strength' in principled_bsdf.inputs:
-                principled_bsdf.inputs['Emission Strength'].default_value = 0.5  # Умеренная сила эмиссии
+        if external_side_info:
+            # Применяем желтый цвет только к уличной стороне
+            apply_external_side_material(obj, external_side_info, wall_height)
+            print(f"    ВНЕШНЯЯ СТЕНА с уличной стороной {external_side_info['face']}: {segment_data['segment_id']}")
         else:
-            # Если входа эмиссии нет, используем только базовый цвет
-            principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-            # Увеличиваем шероховатость для лучшей видимости
-            if 'Roughness' in principled_bsdf.inputs:
-                principled_bsdf.inputs['Roughness'].default_value = 0.8
-        
-        # Соединяем узлы
-        links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
-        
-        if obj.data.materials:
-            obj.data.materials[0] = yellow_mat
-        else:
-            obj.data.materials.append(yellow_mat)
+            # Если нет информации о стороне, красим всю стену (текущее поведение)
+            yellow_mat = bpy.data.materials.new(name="ExternalWallMaterial")
+            yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+            yellow_mat.use_nodes = True
             
-        print(f"    ВНЕШНЯЯ СТЕНА (отмечена желтым): {segment_data['segment_id']}")
+            # Настраиваем материал для лучшей видимости
+            nodes = yellow_mat.node_tree.nodes
+            links = yellow_mat.node_tree.links
+            
+            # Очищаем стандартные узлы
+            nodes.clear()
+            
+            # Создаем основные узлы
+            output_node = nodes.new(type='ShaderNodeOutputMaterial')
+            principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+            
+            # Настраиваем эмиссию для лучшей видимости
+            principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+            
+            # Проверяем наличие входов эмиссии (зависит от версии Blender)
+            if 'Emission' in principled_bsdf.inputs:
+                principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
+                if 'Emission Strength' in principled_bsdf.inputs:
+                    principled_bsdf.inputs['Emission Strength'].default_value = 0.5  # Умеренная сила эмиссии
+            else:
+                # Если входа эмиссии нет, используем только базовый цвет
+                principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+                # Увеличиваем шероховатость для лучшей видимости
+                if 'Roughness' in principled_bsdf.inputs:
+                    principled_bsdf.inputs['Roughness'].default_value = 0.8
+            
+            # Соединяем узлы
+            links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+            
+            if obj.data.materials:
+                obj.data.materials[0] = yellow_mat
+            else:
+                obj.data.materials.append(yellow_mat)
+                
+            print(f"    ВНЕШНЯЯ СТЕНА (полностью желтая): {segment_data['segment_id']}")
     else:
         # Внутренняя стена или стандартный материал
         mat = bpy.data.materials.new(name="InternalWallMaterial")
@@ -1976,6 +2385,29 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         )
         print(f"  Найдено внешних стен: {len(external_wall_ids)}")
         
+        # Определяем уличные стороны для внешних стен
+        print("Определение уличных сторон для внешних стен...")
+        
+        # Проверяем, есть ли данные о улице в JSON
+        if "street" in data:
+            print("Используем данные о улице из JSON для определения уличных сторон...")
+            external_side_info = determine_external_sides_by_street_point(
+                junctions,
+                wall_segments_from_openings,
+                wall_segments_from_junctions,
+                building_outline,
+                data["street"]
+            )
+        else:
+            print("Данные о улице отсутствуют, используем стандартный метод обхода контура...")
+            external_side_info = determine_external_sides_by_contour_traversal(
+                junctions,
+                wall_segments_from_openings,
+                wall_segments_from_junctions,
+                building_outline
+            )
+        print(f"  Определено уличных сторон: {len(external_side_info)}")
+        
         # Дополнительно определяем внешние проемы на основе контура (для совместимости)
         print("Определение внешних проемов по контуру...")
         tolerance_multiplier = 2.0  # Увеличиваем tolerance в 2 раза
@@ -2004,9 +2436,14 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             else:
                 print(f"  Внутренняя стена {i+1}/{len(wall_segments_from_openings)}: {segment['segment_id']}")
             
+            # Получаем информацию об уличной стороне для внешних стен
+            side_info = None
+            if is_ext and segment["segment_id"] in external_side_info:
+                side_info = external_side_info[segment["segment_id"]]
+            
             # Создаем стену с соответствующим материалом
             wall_obj = create_wall_mesh(segment, wall_height_meters, wall_thickness, scale_factor,
-                                      is_external=is_ext, brick_material=brick_material)
+                                      is_external=is_ext, brick_material=brick_material, external_side_info=side_info)
             if wall_obj:
                 wall_objects.append(wall_obj)
                 if is_ext:
@@ -2027,9 +2464,14 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             else:
                 print(f"  Внутренняя стена соединения {i+1}/{len(wall_segments_from_junctions)}: {segment['segment_id']}")
             
+            # Получаем информацию об уличной стороне для внешних стен
+            side_info = None
+            if is_ext and segment["segment_id"] in external_side_info:
+                side_info = external_side_info[segment["segment_id"]]
+            
             # Создаем стену с соответствующим материалом
             wall_obj = create_wall_mesh(segment, wall_height_meters, wall_thickness, scale_factor,
-                                      is_external=is_ext, brick_material=brick_material)
+                                      is_external=is_ext, brick_material=brick_material, external_side_info=side_info)
             if wall_obj:
                 wall_objects.append(wall_obj)
                 if is_ext:

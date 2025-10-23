@@ -2813,8 +2813,8 @@ def visualize_polygons_opening_based_with_junction_types():
     for jtype, count in type_counts.items():
         print(f"  {jtype}: {count}")
     
-    # Добавляем объекты outline и foundation в основной JSON файл
-    add_outline_and_foundation_to_main_json(input_path, output_json_path)
+    # Добавляем объекты outline, foundation и street в основной JSON файл
+    copy_to_main_json(input_path, output_json_path)
     
     print(f"\nГотово! Векторная визуализация с измененной логикой расширения сегментов создана: {output_path}")
     print(f"Данные координат сохранены в: {output_json_path}")
@@ -3836,16 +3836,16 @@ def replace_pillars_in_existing_svg():
     
     replace_pillars_with_squares(svg_path, wall_thickness)
 
-def add_outline_and_foundation_to_main_json(input_path: str, output_json_path: str) -> None:
+def copy_to_main_json(input_path: str, output_json_path: str) -> None:
     """
-    Добавляет объекты outline и foundation из исходного JSON файла в основной wall_coordinates.json
+    Добавляет объекты outline, foundation и street из исходного JSON файла в основной wall_coordinates.json
     
     Args:
         input_path: Путь к исходному JSON файлу
         output_json_path: Путь к основному JSON файлу wall_coordinates.json
     """
     print(f"\n{'='*60}")
-    print("ДОБАВЛЕНИЕ ОБЪЕКТОВ OUTLINE И FOUNDATION В ОСНОВНОЙ JSON")
+    print("КОПИРОВАНИЕ ОБЪЕКТОВ OUTLINE, FOUNDATION И STREET В ОСНОВНОЙ JSON")
     print(f"{'='*60}")
     
     try:
@@ -3861,7 +3861,7 @@ def add_outline_and_foundation_to_main_json(input_path: str, output_json_path: s
         
         print(f"  ✓ Основной JSON файл загружен: {output_json_path}")
         
-        # Добавляем объекты outline и foundation в основной файл
+        # Добавляем объекты outline, foundation и street в основной файл
         if source_data.get("building_outline"):
             main_data["building_outline"] = source_data["building_outline"]
             outline = source_data["building_outline"]
@@ -3872,22 +3872,28 @@ def add_outline_and_foundation_to_main_json(input_path: str, output_json_path: s
             foundation = source_data["foundation"]
             print(f"  ✓ Foundation добавлен: {foundation.get('id')}, {len(foundation.get('vertices', []))} вершин")
         
+        if source_data.get("street"):
+            main_data["street"] = source_data["street"]
+            street = source_data["street"]
+            print(f"  ✓ Street добавлен: {street.get('id')}, {len(street.get('vertices', []))} вершин")
+        
         # Обновляем статистику
         if "statistics" not in main_data:
             main_data["statistics"] = {}
         
         main_data["statistics"]["has_building_outline"] = source_data.get("building_outline") is not None
         main_data["statistics"]["has_foundation"] = source_data.get("foundation") is not None
+        main_data["statistics"]["has_street"] = source_data.get("street") is not None
         
         # Сохраняем обновленный основной файл
         with open(output_json_path, 'w') as f:
             json.dump(main_data, f, indent=2)
         
         print(f"  ✓ Основной JSON файл обновлен: {output_json_path}")
-        print(f"  ✓ Добавление объектов завершено успешно")
+        print(f"  ✓ Копирование объектов завершено успешно")
         
     except Exception as e:
-        print(f"  ✗ Ошибка при добавлении объектов: {e}")
+        print(f"  ✗ Ошибка при копировании объектов: {e}")
 
 if __name__ == '__main__':
     # Сначала пробуем запустить основную функцию

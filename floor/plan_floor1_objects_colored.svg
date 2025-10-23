@@ -71,6 +71,17 @@
     <polygon fill="none" opacity="1.0" points="118.4316,61.898 88.7205,62.3107 89.1332,90.7838 89.1332,154.7451 88.7205,254.1946 89.1332,279.3665 89.1332,304.5384 88.7205,402.3373 114.7177,403.5753 151.8565,402.7499 172.0766,402.3373 257.0832,403.5753 311.1408,402.7499 324.7584,403.1626 324.7584,450.6178 338.7886,449.7925 431.6357,450.2051 446.0786,450.6178 445.6659,287.2069 446.0786,261.2098 445.6659,242.6403 446.0786,216.6432 446.0786,61.898 332.5988,61.898 296.2853,61.898 295.46,61.898 257.0832,62.3107 182.3929,62.3107 118.4316,61.898" stroke="#FFFF00" stroke-width="1"/>
     <text fill="#FFFF00" font-size="5" font-weight="bold" opacity="0.8" text-anchor="middle" x="252.61517296963046" y="250.73688744988777">BUILDING OUTLINE</text>
   </g>
+  <g id="street">
+    <line stroke="#FFA500" stroke-linecap="round" stroke-width="1" x1="118.4316" x2="118.4316" y1="61.898" y2="49.3087"/>
+    <line stroke="#0000FF" stroke-linecap="round" stroke-width="1" x1="118.4316" x2="118.4316" y1="61.898" y2="74.4874"/>
+    <line stroke="#FF00FF" stroke-dasharray="(5, 5)" stroke-linecap="round" stroke-width="0" x1="118.4316" x2="118.4316" y1="49.3087" y2="74.4874"/>
+    <circle cx="118.4316" cy="61.898" fill="#00FF00" r="3" stroke="darkgreen" stroke-width="0"/>
+    <circle cx="118.4316" cy="49.3087" fill="#FFA500" r="2" stroke="darkorange" stroke-width="0"/>
+    <circle cx="118.4316" cy="74.4874" fill="#0000FF" r="2" stroke="darkblue" stroke-width="0"/>
+    <text fill="#00FF00" font-size="4" font-weight="bold" text-anchor="middle" x="118.43159379407616" y="57.898045536973605">J</text>
+    <text fill="#FFA500" font-size="4" font-weight="bold" text-anchor="middle" x="118.43159379407616" y="45.30866899847861">Street</text>
+    <text fill="#0000FF" font-size="4" font-weight="bold" text-anchor="middle" x="118.43159379407616" y="70.4874220754686">Home</text>
+  </g>
   <g font-size="5" id="legend">
     <rect fill="#8B4513" height="6" stroke="black" stroke-width="1" width="8" x="8" y="8"/>
     <text fill="black" font-family="Arial" x="20" y="12">Walls (Hatching)</text>
@@ -90,6 +101,8 @@
     <text fill="black" font-family="Arial" x="20" y="82">Foundation</text>
     <rect fill="#FFFF00" height="6" stroke="black" stroke-width="1" width="8" x="8" y="88"/>
     <text fill="black" font-family="Arial" x="20" y="92">Building Outline</text>
+    <rect fill="#FF00FF" height="6" stroke="black" stroke-width="1" width="8" x="8" y="98"/>
+    <text fill="black" font-family="Arial" x="20" y="102">Street Object</text>
   </g>
   <g id="title">
     <text fill="black" font-family="Arial" font-size="8" font-weight="bold" text-anchor="middle" x="422" y="12">Floor Plan Detection Results</text>

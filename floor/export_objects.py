@@ -1518,6 +1518,217 @@ def find_building_outline_from_junctions(junctions, pillar_polygons=None, openin
         "source": "junction_contour_fixed"
     }
 
+def find_nearest_junction_to_point(point, junctions):
+    """
+    Находит ближайшую junction к заданной точке
+    
+    Args:
+        point: Точка с координатами x, y
+        junctions: Список junctions
+        
+    Returns:
+        dict: Ближайшая junction или None
+    """
+    if not junctions:
+        return None
+    
+    min_distance = float('inf')
+    nearest_junction = None
+    
+    for junction in junctions:
+        distance = np.sqrt((junction['x'] - point['x'])**2 + (junction['y'] - point['y'])**2)
+        if distance < min_distance:
+            min_distance = distance
+            nearest_junction = junction
+    
+    return nearest_junction
+
+def find_outbound_junction(junctions, building_outline):
+    """
+    Находит первую junction из контура здания (outbound junction)
+    
+    Args:
+        junctions: Список junctions
+        building_outline: Контур здания с вершинами
+        
+    Returns:
+        dict: Первая junction из контура или None
+    """
+    if not junctions or not building_outline or not building_outline.get('vertices'):
+        return None
+    
+    # Получаем вершины контура здания
+    outline_vertices = building_outline['vertices']
+    
+    # Ищем первую вершину контура, которая имеет информацию о junction
+    for vertex in outline_vertices:
+        if 'junction_id' in vertex:
+            # Находим соответствующую junction в списке junctions
+            for junction in junctions:
+                if junction.get('id') == vertex['junction_id']:
+                    print(f"   Found outbound junction: J{junction['id']} at ({junction['x']:.1f}, {junction['y']:.1f})")
+                    return junction
+    
+    # Если не нашли junction с ID, ищем по координатам
+    for vertex in outline_vertices:
+        for junction in junctions:
+            if abs(junction['x'] - vertex['x']) < 1 and abs(junction['y'] - vertex['y']) < 1:
+                print(f"   Found outbound junction by coordinates: J{junction.get('id', 'unknown')} at ({junction['x']:.1f}, {junction['y']:.1f})")
+                return junction
+    
+    print("   No outbound junction found in building outline")
+    return None
+
+def point_to_line_segment_distance_with_projection(point, line_p1, line_p2):
+    """
+    Вычисляет расстояние от точки до отрезка и находит проекцию точки на отрезок
+    
+    Args:
+        point: Точка с координатами x, y
+        line_p1: Начальная точка отрезка
+        line_p2: Конечная точка отрезка
+        
+    Returns:
+        tuple: (расстояние, проекция_точки, параметр_t)
+    """
+    # Конвертируем в numpy arrays
+    p = np.array([point['x'], point['y']])
+    p1 = np.array([line_p1['x'], line_p1['y']])
+    p2 = np.array([line_p2['x'], line_p2['y']])
+    
+    # Длина отрезка
+    line_vec = p2 - p1
+    line_len_sq = np.dot(line_vec, line_vec)
+    
+    if line_len_sq == 0:
+        # Отрезок вырожден в точку
+        return np.linalg.norm(p - p1), p1, 0
+    
+    # Проекция точки на линию
+    t = max(0, min(1, np.dot(p - p1, line_vec) / line_len_sq))
+    projection = p1 + t * line_vec
+    
+    # Расстояние от точки до проекции
+    distance = np.linalg.norm(p - projection)
+    
+    return distance, {"x": float(projection[0]), "y": float(projection[1])}, t
+
+def find_closest_foundation_edge(junction, foundation):
+    """
+    Находит ближайший край фундамента к junction
+    
+    Args:
+        junction: Junction с координатами x, y
+        foundation: Полигон фундамента с вершинами
+        
+    Returns:
+        tuple: (ближайший_отрезок, расстояние, проекция, параметр_t)
+    """
+    if not foundation or not foundation.get('vertices'):
+        return None, float('inf'), None, None
+    
+    vertices = foundation['vertices']
+    
+    min_distance = float('inf')
+    closest_edge = None
+    closest_projection = None
+    closest_t = None
+    
+    # Проверяем каждый отрезок фундамента
+    for i in range(len(vertices)):
+        p1 = vertices[i]
+        p2 = vertices[(i + 1) % len(vertices)]
+        
+        distance, projection, t = point_to_line_segment_distance_with_projection(junction, p1, p2)
+        
+        if distance < min_distance:
+            min_distance = distance
+            closest_edge = (p1, p2)
+            closest_projection = projection
+            closest_t = t
+    
+    return closest_edge, min_distance, closest_projection, closest_t
+
+def create_street_object(junction, foundation_edge, wall_thickness):
+    """
+    Создает объект street с тремя точками: junction и две равноудаленные точки
+    
+    Args:
+        junction: Junction с координатами x, y
+        foundation_edge: Ближайший край фундамента (кортеж из двух точек)
+        wall_thickness: Толщина стены
+        
+    Returns:
+        dict: Объект street с тремя точками
+    """
+    if not foundation_edge:
+        return None
+    
+    # Две ширины стены
+    two_wall_thickness = 2 * wall_thickness
+    
+    # Получаем точки края фундамента
+    p1, p2 = foundation_edge
+    
+    # Вычисляем вектор направления от p1 к p2
+    dx = p2['x'] - p1['x']
+    dy = p2['y'] - p1['y']
+    
+    # Длина вектора
+    length = np.sqrt(dx**2 + dy**2)
+    
+    if length == 0:
+        return None
+    
+    # Нормализуем вектор
+    dx_norm = dx / length
+    dy_norm = dy / length
+    
+    # Вычисляем вектор перпендикулярный к краю фундамента
+    # Для этого поворачиваем нормализованный вектор на 90 градусов
+    perp_dx = -dy_norm
+    perp_dy = dx_norm
+    
+    # Создаем две равноудаленные точки от junction в противоположных направлениях
+    # Одна точка будет в направлении перпендикуляра, другая - в противоположном
+    street_point = {
+        'x': junction['x'] + perp_dx * two_wall_thickness,
+        'y': junction['y'] + perp_dy * two_wall_thickness
+    }
+    
+    home_point = {
+        'x': junction['x'] - perp_dx * two_wall_thickness,
+        'y': junction['y'] - perp_dy * two_wall_thickness
+    }
+    
+    # Проверяем, какая из точек находится ближе к фундаменту
+    # Та, что ближе к фундаменту, будет street точкой
+    _, projection1, _ = point_to_line_segment_distance_with_projection(street_point, p1, p2)
+    _, projection2, _ = point_to_line_segment_distance_with_projection(home_point, p1, p2)
+    
+    dist1 = np.sqrt((street_point['x'] - projection1['x'])**2 + (street_point['y'] - projection1['y'])**2)
+    dist2 = np.sqrt((home_point['x'] - projection2['x'])**2 + (home_point['y'] - projection2['y'])**2)
+    
+    # Если home точка ближе к фундаменту, меняем их местами
+    if dist2 < dist1:
+        street_point, home_point = home_point, street_point
+    
+    # Создаем объект street
+    street_object = {
+        'id': 'street_1',
+        'junction_id': str(junction.get('id', '')),
+        'junction': {
+            'x': float(junction['x']),
+            'y': float(junction['y'])
+        },
+        'street_point': street_point,
+        'home_point': home_point,
+        'wall_thickness': float(wall_thickness),
+        'distance_to_foundation': float(min(dist1, dist2))
+    }
+    
+    return street_object
+
 def estimate_wall_thickness(wall_segments):
     """Estimate wall thickness from parallel segments"""
     if len(wall_segments) < 2:
@@ -1569,7 +1780,7 @@ def estimate_wall_thickness(wall_segments):
     
     return 10  # Default thickness
 
-def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars, rooms, pillar_polygons, foundation, building_outline, scale_factor):
+def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars, rooms, pillar_polygons, foundation, building_outline, street, scale_factor):
     """Create colored SVG file with all detected objects"""
     height, width = image_shape[:2]
     
@@ -1590,7 +1801,11 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
         'room': '#F0F8FF',            # Alice blue (light) for rooms
         'room_border': '#708090',     # Slate gray for room borders
         'foundation': '#FF0000',      # Red for foundation
-        'building_outline': '#FFFF00'  # Yellow for building outline
+        'building_outline': '#FFFF00', # Yellow for building outline
+        'street': '#FF00FF',          # Magenta for street object
+        'junction_point': '#00FF00',   # Green for junction point
+        'street_point': '#FFA500',     # Orange for street point
+        'home_point': '#0000FF'        # Blue for home point
     }
     
     # Draw rooms (background)
@@ -1765,6 +1980,103 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
                     opacity=0.8
                 ))
     
+    # Draw street object
+    if street:
+        street_group = dwg.add(dwg.g(id='street'))
+        
+        # Extract points from street object
+        junction = street['junction']
+        street_point = street['street_point']
+        home_point = street['home_point']
+        
+        # Scale points
+        junction_scaled = (float(junction['x'] * scale_factor), float(junction['y'] * scale_factor))
+        street_point_scaled = (float(street_point['x'] * scale_factor), float(street_point['y'] * scale_factor))
+        home_point_scaled = (float(home_point['x'] * scale_factor), float(home_point['y'] * scale_factor))
+        
+        # Draw line from junction to street point
+        street_group.add(dwg.line(
+            start=junction_scaled,
+            end=street_point_scaled,
+            stroke=colors['street_point'],
+            stroke_width=int(3 * scale_factor),
+            stroke_linecap='round'
+        ))
+        
+        # Draw line from junction to home point
+        street_group.add(dwg.line(
+            start=junction_scaled,
+            end=home_point_scaled,
+            stroke=colors['home_point'],
+            stroke_width=int(3 * scale_factor),
+            stroke_linecap='round'
+        ))
+        
+        # Draw line from street point to home point
+        street_group.add(dwg.line(
+            start=street_point_scaled,
+            end=home_point_scaled,
+            stroke=colors['street'],
+            stroke_width=int(2 * scale_factor),
+            stroke_linecap='round',
+            stroke_dasharray=(5, 5)
+        ))
+        
+        # Draw junction point
+        street_group.add(dwg.circle(
+            center=junction_scaled,
+            r=int(8 * scale_factor),
+            fill=colors['junction_point'],
+            stroke='darkgreen',
+            stroke_width=int(2 * scale_factor)
+        ))
+        
+        # Draw street point
+        street_group.add(dwg.circle(
+            center=street_point_scaled,
+            r=int(6 * scale_factor),
+            fill=colors['street_point'],
+            stroke='darkorange',
+            stroke_width=int(2 * scale_factor)
+        ))
+        
+        # Draw home point
+        street_group.add(dwg.circle(
+            center=home_point_scaled,
+            r=int(6 * scale_factor),
+            fill=colors['home_point'],
+            stroke='darkblue',
+            stroke_width=int(2 * scale_factor)
+        ))
+        
+        # Add labels
+        street_group.add(dwg.text(
+            'J',
+            insert=(junction_scaled[0], junction_scaled[1] - int(12 * scale_factor)),
+            text_anchor='middle',
+            fill=colors['junction_point'],
+            font_size=int(12 * scale_factor),
+            font_weight='bold'
+        ))
+        
+        street_group.add(dwg.text(
+            'Street',
+            insert=(street_point_scaled[0], street_point_scaled[1] - int(12 * scale_factor)),
+            text_anchor='middle',
+            fill=colors['street_point'],
+            font_size=int(10 * scale_factor),
+            font_weight='bold'
+        ))
+        
+        street_group.add(dwg.text(
+            'Home',
+            insert=(home_point_scaled[0], home_point_scaled[1] - int(12 * scale_factor)),
+            text_anchor='middle',
+            fill=colors['home_point'],
+            font_size=int(10 * scale_factor),
+            font_weight='bold'
+        ))
+    
     # Add legend
     legend_group = dwg.add(dwg.g(id='legend', font_size=int(14 * scale_factor)))
     legend_x = int(20 * scale_factor)
@@ -1780,7 +2092,8 @@ def create_colored_svg(output_path, image_shape, walls, doors, windows, pillars,
         ('Pillar Polygons', colors['pillar_polygon']),
         ('Rooms', colors['room']),
         ('Foundation', colors['foundation']),
-        ('Building Outline', colors['building_outline'])
+        ('Building Outline', colors['building_outline']),
+        ('Street Object', colors['street'])
     ]
     
     for i, (label, color) in enumerate(legend_items):
@@ -2141,6 +2454,7 @@ def main():
             "junctions": [],
             "foundation": None,  # Поле для фундамента здания
             "building_outline": None,  # Поле для контура здания
+            "street": None,  # Поле для объекта street
             "statistics": {
                 "walls": 0,
                 "windows": 0,
@@ -2150,7 +2464,8 @@ def main():
                 "rooms": 0,
                 "junctions": 0,
                 "foundations": 0,  # Новое поле в статистике для фундамента
-                "building_outlines": 0  # Новое поле в статистике для контура здания
+                "building_outlines": 0,  # Новое поле в статистике для контура здания
+                "streets": 0  # Новое поле в статистике для объекта street
             }
         }
 
@@ -2363,6 +2678,45 @@ def main():
         except Exception as e:
             print(f"   Error creating building outline: {e}")
 
+        # Create street object
+        print("\n   Creating street object...")
+        try:
+            if json_data["foundation"] and json_data["junctions"] and json_data["building_outline"]:
+                # 1. Находим outbound junction (первая junction из контура здания)
+                outbound_junction = find_outbound_junction(json_data["junctions"], json_data["building_outline"])
+                if outbound_junction:
+                    print(f"   Outbound junction found: ({outbound_junction['x']:.1f}, {outbound_junction['y']:.1f})")
+                    
+                    # 2. Находим ближайший край фундамента к outbound junction
+                    foundation_edge, distance, projection, t = find_closest_foundation_edge(
+                        outbound_junction, json_data["foundation"])
+                    if foundation_edge:
+                        print(f"   Closest foundation edge found, distance: {distance:.1f}px")
+                        
+                        # 3-5. Создаем объект street с тремя точками
+                        street_object = create_street_object(outbound_junction, foundation_edge, wall_thickness_pixels)
+                        if street_object:
+                            json_data["street"] = street_object
+                            print(f"   Street object created with wall thickness: {wall_thickness_pixels:.1f}px")
+                            print(f"   Outbound junction: ({street_object['junction']['x']:.1f}, {street_object['junction']['y']:.1f})")
+                            print(f"   Street point: ({street_object['street_point']['x']:.1f}, {street_object['street_point']['y']:.1f})")
+                            print(f"   Home point: ({street_object['home_point']['x']:.1f}, {street_object['home_point']['y']:.1f})")
+                        else:
+                            print("   Failed to create street object")
+                    else:
+                        print("   No foundation edge found")
+                else:
+                    print("   No outbound junction found in building outline")
+            else:
+                if not json_data["foundation"]:
+                    print("   No foundation available for street creation")
+                elif not json_data["junctions"]:
+                    print("   No junctions available for street creation")
+                elif not json_data["building_outline"]:
+                    print("   No building outline available for street creation")
+        except Exception as e:
+            print(f"   Error creating street object: {e}")
+
         # Update statistics
         json_data["statistics"]["walls"] = len(json_data["walls"])
         json_data["statistics"]["windows"] = len([o for o in json_data["openings"] if o["type"] == "window"])
@@ -2373,6 +2727,7 @@ def main():
         json_data["statistics"]["junctions"] = len(json_data["junctions"])
         json_data["statistics"]["foundations"] = 1 if json_data["foundation"] else 0
         json_data["statistics"]["building_outlines"] = 1 if json_data["building_outline"] else 0
+        json_data["statistics"]["streets"] = 1 if json_data["street"] else 0
 
         # Save to file
         with open(output_path, 'w') as f:
@@ -2395,6 +2750,7 @@ def main():
                 pillar_polygons_hatching,  # Новый параметр
                 json_data["foundation"],   # Добавляем фундамент
                 json_data["building_outline"],  # Добавляем контур здания
+                json_data["street"],        # Добавляем объект street
                 scale
             )
             print(f"   SVG saved to: {svg_output_path} ({svg_w}x{svg_h})")
@@ -2415,6 +2771,7 @@ def main():
     print(f"  Pillars: {len(json_data['pillars'])}")
     print(f"  Pillar polygons: {len(json_data['pillar_polygons'])}")
     print(f"  Rooms:   {len(json_data['rooms'])}")
+    print(f"  Streets: {len(json_data['street']) if json_data['street'] else 0}")
     print(f"\nOutput:")
     print(f"  JSON: {output_path}")
     print(f"  SVG:  {output_path.replace('.json', '_colored.svg')}")
