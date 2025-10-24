@@ -1,0 +1,173 @@
+{
+  "wall_window_2_left_14_to_6": {
+    "normal_direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "junction_start_id": "14",
+    "junction_end_id": "6"
+  },
+  "wall_window_3_top_28_to_6": {
+    "normal_direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "6",
+    "junction_end_id": "28"
+  },
+  "wall_window_3_bottom_34_to_12": {
+    "normal_direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "34",
+    "junction_end_id": "12"
+  },
+  "wall_window_5_top_32_to_12": {
+    "normal_direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "12",
+    "junction_end_id": "32"
+  },
+  "wall_window_5_bottom_38_to_4": {
+    "normal_direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "38",
+    "junction_end_id": "4"
+  },
+  "wall_door_3_left_18_to_4": {
+    "normal_direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "junction_start_id": "4",
+    "junction_end_id": "18"
+  },
+  "wall_door_3_right_25_to_11": {
+    "normal_direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "junction_start_id": "25",
+    "junction_end_id": "11"
+  },
+  "wall_door_1_left_19_to_11": {
+    "normal_direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "junction_start_id": "11",
+    "junction_end_id": "19"
+  },
+  "wall_door_1_right_26_to_10": {
+    "normal_direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "junction_start_id": "26",
+    "junction_end_id": "10"
+  },
+  "wall_junction_5_to_10_up": {
+    "normal_direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "10",
+    "junction_end_id": "5"
+  },
+  "wall_window_1_left_20_to_5": {
+    "normal_direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "junction_start_id": "5",
+    "junction_end_id": "20"
+  },
+  "wall_window_1_right_27_to_3": {
+    "normal_direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "junction_start_id": "27",
+    "junction_end_id": "3"
+  },
+  "wall_window_7_bottom_36_to_3": {
+    "normal_direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "3",
+    "junction_end_id": "36"
+  },
+  "wall_window_6_bottom_35_to_30": {
+    "normal_direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "30",
+    "junction_end_id": "35"
+  },
+  "wall_window_7_top_30_to_35": {
+    "normal_direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "30",
+    "junction_end_id": "35"
+  },
+  "wall_window_6_top_29_to_7": {
+    "normal_direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "junction_start_id": "29",
+    "junction_end_id": "7"
+  },
+  "wall_door_2_right_22_to_7": {
+    "normal_direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "junction_start_id": "7",
+    "junction_end_id": "22"
+  },
+  "wall_window_2_right_23_to_16": {
+    "normal_direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "junction_start_id": "16",
+    "junction_end_id": "23"
+  },
+  "wall_window_4_left_16_to_23": {
+    "normal_direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "junction_start_id": "16",
+    "junction_end_id": "23"
+  }
+}
