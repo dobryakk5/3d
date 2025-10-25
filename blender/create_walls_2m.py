@@ -1423,18 +1423,18 @@ def setup_material_emission(material, color):
 def apply_external_side_material(wall_obj, external_side_info, wall_height, segment_id=None):
     """
     Применяет желтый материал только к уличной стороне внешней стены
-    
+
     Важно: все поверхности между поворотами должны иметь одинаковое определение (уличные или внутренние)
     """
     # Создаем материалы
     yellow_mat = bpy.data.materials.new(name=f"ExternalSideMaterial_{segment_id}")
     yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
     yellow_mat.use_nodes = True
-    
+
     gray_mat = bpy.data.materials.new(name=f"InternalSideMaterial_{segment_id}")
     gray_mat.diffuse_color = (0.8, 0.8, 0.8, 1.0)  # Светло-серый
     gray_mat.use_nodes = True
-    
+
     # Настраиваем материалы для лучшей видимости
     setup_material_emission(yellow_mat, (1.0, 1.0, 0.0, 1.0))
     setup_material_emission(gray_mat, (0.8, 0.8, 0.8, 1.0))
@@ -1467,13 +1467,13 @@ def apply_external_side_material(wall_obj, external_side_info, wall_height, segm
     # Применяем материалы к объекту
     wall_obj.data.materials.append(yellow_mat)
     wall_obj.data.materials.append(gray_mat)
-    
+
     print(f"    Применен желтый материал к уличной стороне стены: {segment_id}")
 
 def apply_external_side_material_to_fill(fill_obj, external_side_info, fill_height):
     """
     Применяет желтый материал только к уличной стороне заполнения проема
-    
+
     Args:
         fill_obj: объект заполнения проема
         external_side_info: информация об уличной стороне от родительской стены
@@ -1483,11 +1483,11 @@ def apply_external_side_material_to_fill(fill_obj, external_side_info, fill_heig
     yellow_mat = bpy.data.materials.new(name="FillExternalSideMaterial")
     yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
     yellow_mat.use_nodes = True
-    
+
     gray_mat = bpy.data.materials.new(name="FillInternalSideMaterial")
     gray_mat.diffuse_color = (0.8, 0.8, 0.8, 1.0)  # Светло-серый
     gray_mat.use_nodes = True
-    
+
     # Настраиваем материалы для лучшей видимости
     setup_material_emission(yellow_mat, (1.0, 1.0, 0.0, 1.0))
     setup_material_emission(gray_mat, (0.8, 0.8, 0.8, 1.0))
@@ -3213,6 +3213,79 @@ def setup_isometric_camera_and_render(output_path="isometric_view.jpg"):
         traceback.print_exc()
         return False
 
+def merge_external_outline_walls(wall_objects, external_wall_ids):
+    """
+    Объединяет все внешние стены (outline стены дома) в один меш
+
+    Args:
+        wall_objects: список всех объектов стен
+        external_wall_ids: множество ID внешних стен
+
+    Returns:
+        объект объединенной внешней стены или None
+    """
+    try:
+        # Собираем все внешние стены
+        external_wall_objects = []
+        internal_wall_objects = []
+
+        for obj in wall_objects:
+            # Проверяем, является ли стена внешней по имени
+            if obj and obj.name in bpy.data.objects:
+                if "External_Wall" in obj.name:
+                    external_wall_objects.append(obj)
+                else:
+                    internal_wall_objects.append(obj)
+
+        print(f"Найдено внешних стен для объединения: {len(external_wall_objects)}")
+        print(f"Внутренних стен (не объединяются): {len(internal_wall_objects)}")
+
+        if len(external_wall_objects) == 0:
+            print("Нет внешних стен для объединения")
+            return None
+
+        if len(external_wall_objects) == 1:
+            print("Только одна внешняя стена, объединение не требуется")
+            return external_wall_objects[0]
+
+        # Снимаем выделение со всех объектов
+        bpy.ops.object.select_all(action='DESELECT')
+
+        # Выделяем все внешние стены
+        for obj in external_wall_objects:
+            obj.select_set(True)
+
+        # Устанавливаем первую стену как активную
+        bpy.context.view_layer.objects.active = external_wall_objects[0]
+
+        # Сохраняем материал первой стены для применения к объединенной
+        first_wall_material = None
+        if external_wall_objects[0].data.materials:
+            first_wall_material = external_wall_objects[0].data.materials[0]
+
+        # Объединяем все выделенные объекты
+        print("Объединение внешних стен...")
+        bpy.ops.object.join()
+
+        # Получаем объединенный объект (это теперь активный объект)
+        merged_wall = bpy.context.active_object
+        merged_wall.name = "Building_Outline_Merged"
+
+        print(f"Внешние стены успешно объединены в '{merged_wall.name}'")
+
+        # Обновляем меш
+        if merged_wall.data:
+            merged_wall.data.update()
+            merged_wall.data.update_tag()
+
+        return merged_wall
+
+    except Exception as e:
+        print(f"Ошибка при объединении внешних стен: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear_scene=True, brick_texture_path=None, render_isometric=False, show_junction_labels=True):
     """
     Основная функция для создания 3D стен из JSON файла
@@ -3645,11 +3718,33 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
                 # Применяем инверсию ко всем объектам
                 for obj in all_objects:
                     invert_x_coordinates(obj, center_x)
-        
-        # Не объединяем стены, чтобы сохранить отдельные объекты для лучшей визуализации
-        print("Сохранение отдельных объектов стен...")
-        # Стены сохраняют свои исходные имена из JSON
-        
+
+        # Объединяем внешние стены (outline стены дома) в один меш
+        print("=" * 60)
+        print("Объединение внешних outline стен...")
+        merged_outline = merge_external_outline_walls(wall_objects, external_wall_ids)
+
+        if merged_outline:
+            # Обновляем список wall_objects: заменяем внешние стены на объединенную
+            # Фильтруем только существующие внутренние стены и добавляем объединенную
+            remaining_walls = []
+            for obj in wall_objects:
+                try:
+                    # Проверяем, существует ли объект и является ли он внутренней стеной
+                    if obj and obj.name and "Internal_Wall" in obj.name:
+                        remaining_walls.append(obj)
+                except ReferenceError:
+                    # Объект был удален при объединении
+                    pass
+
+            remaining_walls.append(merged_outline)
+            wall_objects = remaining_walls
+            print(f"Внешние стены объединены. Теперь в списке: {len(wall_objects)} объектов стен")
+        else:
+            print("Объединение внешних стен не выполнено, сохраняем отдельные объекты")
+
+        print("=" * 60)
+
         # Экспорт в OBJ
         if export_obj:
             print("Экспорт в OBJ формат...")
@@ -3659,18 +3754,27 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
             # Выделяем все объекты для экспорта
             bpy.ops.object.select_all(action='DESELECT')
             for obj in wall_objects:
-                if obj and obj.name in bpy.data.objects:
-                    obj.select_set(True)
-            
+                try:
+                    if obj and obj.name in bpy.data.objects:
+                        obj.select_set(True)
+                except (ReferenceError, AttributeError):
+                    pass
+
             # Добавляем проёмы к выделению
             for obj in opening_objects:
-                if obj and obj.name in bpy.data.objects:
-                    obj.select_set(True)
-            
+                try:
+                    if obj and obj.name in bpy.data.objects:
+                        obj.select_set(True)
+                except (ReferenceError, AttributeError):
+                    pass
+
             # Добавляем колонны к выделению
             for obj in pillar_objects:
-                if obj and obj.name in bpy.data.objects:
-                    obj.select_set(True)
+                try:
+                    if obj and obj.name in bpy.data.objects:
+                        obj.select_set(True)
+                except (ReferenceError, AttributeError):
+                    pass
             
             # Обновляем сцену перед экспортом
             bpy.context.view_layer.update()
