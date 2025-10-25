@@ -1040,11 +1040,28 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
         
         # Find the next junction in the direction
         end_junction = find_next_junction_in_direction(start_junction, direction, junctions, wall_thickness / 2.0)
-        
+
         if end_junction:
+            # ИСПРАВЛЕНИЕ: Пересчитываем offset после того, как bbox мог быть изменен
+            # Это необходимо, т.к. bbox мог быть сдвинут до junction выше
+            if orientation == 'horizontal':
+                if edge_side == 'left':
+                    offset_x = start_junction.x - bbox['x']
+                    offset_y = start_junction.y - (bbox['y'] + bbox['height'] / 2)
+                else:  # right
+                    offset_x = start_junction.x - (bbox['x'] + bbox['width'])
+                    offset_y = start_junction.y - (bbox['y'] + bbox['height'] / 2)
+            else:  # vertical
+                if edge_side == 'top':
+                    offset_x = start_junction.x - (bbox['x'] + bbox['width'] / 2)
+                    offset_y = start_junction.y - bbox['y']
+                else:  # bottom
+                    offset_x = start_junction.x - (bbox['x'] + bbox['width'] / 2)
+                    offset_y = start_junction.y - (bbox['y'] + bbox['height'])
+
             # Create wall segment from start to end junction
             segment_id = f"wall_{opening_id}_{edge_side}_{start_junction.id}_to_{end_junction.id}"
-            
+
             # Создаем bbox, но с учетом смещения для точной стыковки с углами проема
             if orientation == 'horizontal':
                 # ИСПРАВЛЕНИЕ: Убедимся, что стена начинается точно от junction
@@ -1069,15 +1086,20 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
                     start_y = start_junction.y
                     # УБРАНО: Коррекция на 1 пиксель для избежания перекрытия на SVG
                     # start_y += 1.0
+                    # ИСПРАВЛЕНИЕ: Для нижней стороны проема, end_junction должен быть скорректирован на offset_y
+                    adjusted_end_y = end_junction.y + offset_y
                 else:
                     # УБРАНО: Коррекция на 1 пиксель для верхней стороны проема
                     # start_y = start_junction.y - 1.0
                     start_y = start_junction.y
-                    
+                    # ИСПРАВЛЕНИЕ: Для верхней стороны проема, end_junction должен быть скорректирован на offset_y
+                    adjusted_end_y = end_junction.y + offset_y
+
                 x = (start_junction.x - offset_x) - wall_thickness / 2
-                y = min(start_y, end_junction.y)
+                y = min(start_y, adjusted_end_y)
                 width = wall_thickness
-                height = abs(end_junction.y - start_y)
+                # ИСПРАВЛЕНИЕ: Используем скорректированную координату для end_junction
+                height = abs(adjusted_end_y - start_y)
             
             bbox_result = {
                 'x': x,
@@ -1161,17 +1183,20 @@ def process_openings_with_junctions(data: Dict, wall_thickness: float, json_data
             orientation=orientation,
             edge_junctions=edge_junctions
         )
-        
-        # Добавляем проем в JSON
-        if json_data:
-            add_opening_to_json(json_data, opening, edge_junctions)
-        
+
         print(f"  Вызов construct_wall_segment_from_opening для проема {opening_id}")
         # Construct wall segments from this opening
         wall_segments = construct_wall_segment_from_opening(
             opening_with_junction, junctions, wall_thickness, openings, json_data
         )
-        
+
+        # Добавляем проем в JSON с обновленным bbox после обработки
+        if json_data:
+            # Используем обновленный bbox из opening_with_junction
+            opening_updated = opening.copy()
+            opening_updated['bbox'] = opening_with_junction.bbox
+            add_opening_to_json(json_data, opening_updated, edge_junctions)
+
         all_wall_segments.extend(wall_segments)
         print(f"  ✓ Проем {opening_id} ({orientation}): {len(wall_segments)} сегментов")
     

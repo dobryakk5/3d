@@ -1158,53 +1158,13 @@
   ],
   "openings": [
     {
-      "id": "window_1",
-      "type": "window",
-      "bbox": {
-        "x": 820.0,
-        "y": 1080.0,
-        "width": 227.0,
-        "height": 24.0
-      },
-      "wall_id": "wall_20",
-      "height": 1.5,
-      "sill_height": 1.0,
-      "methods": [
-        "DL",
-        "Wall-aligned",
-        "Junctions"
-      ],
-      "junctions": {
-        "left": {
-          "junction_id": 20,
-          "junction_name": "J20",
-          "junction_type": "wall_intersection",
-          "x": 821.0,
-          "y": 1090.0,
-          "distance": 2.23606797749979
-        },
-        "right": {
-          "junction_id": 27,
-          "junction_name": "J27",
-          "junction_type": "wall_end",
-          "x": 1046.0,
-          "y": 1091.0,
-          "distance": 1.4142135623730951
-        }
-      },
-      "confidence": {
-        "window_prob": 0.9405709505081177,
-        "door_prob": 0.0011070928303524852
-      }
-    },
-    {
       "id": "window_2",
       "type": "window",
       "bbox": {
         "x": 286.0,
         "y": 139.0,
         "width": 156.0,
-        "height": 28.0
+        "height": 22.0
       },
       "wall_id": "wall_16",
       "height": 1.5,
@@ -1235,56 +1195,29 @@
       "confidence": {
         "window_prob": 0.995707094669342,
         "door_prob": 0.0002977849799208343
-      }
-    },
-    {
-      "id": "window_3",
-      "type": "window",
-      "bbox": {
-        "x": 204.0,
-        "y": 220.0,
-        "width": 23.0,
-        "height": 155.0
       },
-      "wall_id": "wall_17",
-      "height": 1.5,
-      "sill_height": 1.0,
-      "methods": [
-        "DL",
-        "Wall-aligned",
-        "Junctions"
-      ],
-      "junctions": {
-        "up": {
-          "junction_id": 28,
-          "junction_name": "J28",
-          "junction_type": "door_frame",
-          "x": 216.0,
-          "y": 220.0,
-          "distance": 0.5
-        },
-        "down": {
-          "junction_id": 34,
-          "junction_name": "J34",
-          "junction_type": "window_frame",
-          "x": 216.0,
-          "y": 375.0,
-          "distance": 0.5
-        }
+      "original_bbox": {
+        "x": 286.0,
+        "y": 142.0,
+        "width": 156.0,
+        "height": 22.0
       },
-      "confidence": {
-        "window_prob": 0.9901547431945801,
-        "door_prob": 0.0014233032707124949
-      }
+      "aligned_bbox": {
+        "x": 286.0,
+        "y": 139.0,
+        "width": 156.0,
+        "height": 22.0
+      },
+      "alignment_offset": -3.0
     },
     {
       "id": "window_4",
       "type": "window",
       "bbox": {
         "x": 622.0,
-        "y": 138.0,
+        "y": 139.0,
         "width": 97.0,
-        "height": 24.0
+        "height": 22.0
       },
       "wall_id": "wall_16",
       "height": 1.5,
@@ -1331,15 +1264,268 @@
       "confidence": {
         "window_prob": 0.9970290064811707,
         "door_prob": 0.0012798423413187265
-      }
+      },
+      "original_bbox": {
+        "x": 622.0,
+        "y": 139.0,
+        "width": 97.0,
+        "height": 22.0
+      },
+      "aligned_bbox": {
+        "x": 622.0,
+        "y": 139.0,
+        "width": 97.0,
+        "height": 22.0
+      },
+      "alignment_offset": 0.0
+    },
+    {
+      "id": "door_2",
+      "type": "door",
+      "bbox": {
+        "x": 720.0,
+        "y": 139.0,
+        "width": 87.0,
+        "height": 22.0
+      },
+      "wall_id": "wall_16",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 15,
+          "junction_name": "J15",
+          "junction_type": "wall_intersection",
+          "x": 718.0,
+          "y": 150.0,
+          "distance": 2.0615528128088303
+        },
+        "right": {
+          "junction_id": 22,
+          "junction_name": "J22",
+          "junction_type": "wall_end",
+          "x": 806.0,
+          "y": 150.0,
+          "distance": 1.118033988749895
+        },
+        "up": {
+          "junction_id": 22,
+          "junction_name": "J22",
+          "junction_type": "wall_end",
+          "x": 806.0,
+          "y": 150.0,
+          "distance": 44.44378471732578
+        },
+        "down": {
+          "junction_id": 22,
+          "junction_name": "J22",
+          "junction_type": "wall_end",
+          "x": 806.0,
+          "y": 150.0,
+          "distance": 44.746508243660756
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9834486842155457,
+        "window_prob": 0.00399630656465888
+      },
+      "original_bbox": {
+        "x": 720.0,
+        "y": 139.5,
+        "width": 87.0,
+        "height": 22.0
+      },
+      "aligned_bbox": {
+        "x": 720.0,
+        "y": 139.0,
+        "width": 87.0,
+        "height": 22.0
+      },
+      "alignment_offset": -0.5
+    },
+    {
+      "id": "door_1",
+      "type": "door",
+      "bbox": {
+        "x": 624.0,
+        "y": 966.5,
+        "width": 131.0,
+        "height": 22.0
+      },
+      "wall_id": "wall_22",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 19,
+          "junction_name": "J19",
+          "junction_type": "wall_intersection",
+          "x": 623.0,
+          "y": 978.0,
+          "distance": 1.118033988749895
+        },
+        "right": {
+          "junction_id": 26,
+          "junction_name": "J26",
+          "junction_type": "wall_end",
+          "x": 754.0,
+          "y": 976.0,
+          "distance": 1.8027756377319946
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9842439889907837,
+        "window_prob": 0.002665352076292038
+      },
+      "original_bbox": {
+        "x": 624.0,
+        "y": 966.5,
+        "width": 131.0,
+        "height": 22.0
+      },
+      "aligned_bbox": {
+        "x": 624.0,
+        "y": 966.5,
+        "width": 131.0,
+        "height": 22.0
+      },
+      "alignment_offset": 0.0
+    },
+    {
+      "id": "door_3",
+      "type": "door",
+      "bbox": {
+        "x": 277.0,
+        "y": 966.5,
+        "width": 92.0,
+        "height": 22.0
+      },
+      "wall_id": null,
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 18,
+          "junction_name": "J18",
+          "junction_type": "wall_intersection",
+          "x": 278.0,
+          "y": 978.0,
+          "distance": 1.0
+        },
+        "right": {
+          "junction_id": 25,
+          "junction_name": "J25",
+          "junction_type": "wall_end",
+          "x": 368.0,
+          "y": 976.0,
+          "distance": 2.23606797749979
+        },
+        "up": {
+          "junction_id": 25,
+          "junction_name": "J25",
+          "junction_type": "wall_end",
+          "x": 368.0,
+          "y": 976.0,
+          "distance": 46.32493928760188
+        },
+        "down": {
+          "junction_id": 18,
+          "junction_name": "J18",
+          "junction_type": "wall_intersection",
+          "x": 278.0,
+          "y": 978.0,
+          "distance": 46.84015371452148
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9892755150794983,
+        "window_prob": 0.00042110614595003426
+      },
+      "original_bbox": {
+        "x": 277.0,
+        "y": 967.0,
+        "width": 92.0,
+        "height": 22.0
+      },
+      "aligned_bbox": {
+        "x": 277.0,
+        "y": 966.5,
+        "width": 92.0,
+        "height": 22.0
+      },
+      "alignment_offset": -0.5
+    },
+    {
+      "id": "window_3",
+      "type": "window",
+      "bbox": {
+        "x": 204.5,
+        "y": 220.0,
+        "width": 22.0,
+        "height": 155.0
+      },
+      "wall_id": "wall_17",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "up": {
+          "junction_id": 28,
+          "junction_name": "J28",
+          "junction_type": "door_frame",
+          "x": 216.0,
+          "y": 220.0,
+          "distance": 0.5
+        },
+        "down": {
+          "junction_id": 34,
+          "junction_name": "J34",
+          "junction_type": "window_frame",
+          "x": 216.0,
+          "y": 375.0,
+          "distance": 0.5
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9901547431945801,
+        "door_prob": 0.0014233032707124949
+      },
+      "original_bbox": {
+        "x": 204.5,
+        "y": 220.0,
+        "width": 22.0,
+        "height": 155.0
+      },
+      "aligned_bbox": {
+        "x": 204.5,
+        "y": 220.0,
+        "width": 22.0,
+        "height": 155.0
+      },
+      "alignment_offset": 0.0
     },
     {
       "id": "window_5",
       "type": "window",
       "bbox": {
-        "x": 205.0,
+        "x": 204.5,
         "y": 676.0,
-        "width": 21.0,
+        "width": 22.0,
         "height": 63.0
       },
       "wall_id": "wall_17",
@@ -1387,15 +1573,28 @@
       "confidence": {
         "window_prob": 0.8417842388153076,
         "door_prob": 0.13593652844429016
-      }
+      },
+      "original_bbox": {
+        "x": 204.5,
+        "y": 676.0,
+        "width": 22.0,
+        "height": 63.0
+      },
+      "aligned_bbox": {
+        "x": 204.5,
+        "y": 676.0,
+        "width": 22.0,
+        "height": 63.0
+      },
+      "alignment_offset": 0.0
     },
     {
       "id": "window_6",
       "type": "window",
       "bbox": {
-        "x": 1070.0,
+        "x": 1069.0,
         "y": 524.0,
-        "width": 20.0,
+        "width": 22.0,
         "height": 64.0
       },
       "wall_id": "wall_19",
@@ -1443,15 +1642,28 @@
       "confidence": {
         "window_prob": 0.7748497724533081,
         "door_prob": 0.08010654151439667
-      }
+      },
+      "original_bbox": {
+        "x": 1069.0,
+        "y": 524.0,
+        "width": 22.0,
+        "height": 64.0
+      },
+      "aligned_bbox": {
+        "x": 1069.0,
+        "y": 524.0,
+        "width": 22.0,
+        "height": 64.0
+      },
+      "alignment_offset": 0.0
     },
     {
       "id": "window_7",
       "type": "window",
       "bbox": {
-        "x": 1070.0,
+        "x": 1069.0,
         "y": 633.0,
-        "width": 20.0,
+        "width": 22.0,
         "height": 62.0
       },
       "wall_id": "wall_19",
@@ -1499,19 +1711,33 @@
       "confidence": {
         "window_prob": 0.800208330154419,
         "door_prob": 0.055307138711214066
-      }
+      },
+      "original_bbox": {
+        "x": 1069.0,
+        "y": 633.0,
+        "width": 22.0,
+        "height": 62.0
+      },
+      "aligned_bbox": {
+        "x": 1069.0,
+        "y": 633.0,
+        "width": 22.0,
+        "height": 62.0
+      },
+      "alignment_offset": 0.0
     },
     {
-      "id": "door_1",
-      "type": "door",
+      "id": "window_1",
+      "type": "window",
       "bbox": {
-        "x": 624.0,
-        "y": 963.0,
-        "width": 131.0,
-        "height": 29.0
+        "x": 820.0,
+        "y": 1081.0,
+        "width": 227.0,
+        "height": 22.0
       },
-      "wall_id": "wall_22",
-      "height": 2.1,
+      "wall_id": "wall_20",
+      "height": 1.5,
+      "sill_height": 1.0,
       "methods": [
         "DL",
         "Wall-aligned",
@@ -1519,143 +1745,34 @@
       ],
       "junctions": {
         "left": {
-          "junction_id": 19,
-          "junction_name": "J19",
+          "junction_id": 20,
+          "junction_name": "J20",
           "junction_type": "wall_intersection",
-          "x": 623.0,
-          "y": 978.0,
-          "distance": 1.118033988749895
-        },
-        "right": {
-          "junction_id": 26,
-          "junction_name": "J26",
-          "junction_type": "wall_end",
-          "x": 754.0,
-          "y": 976.0,
-          "distance": 1.8027756377319946
-        }
-      },
-      "confidence": {
-        "door_prob": 0.9842439889907837,
-        "window_prob": 0.002665352076292038
-      }
-    },
-    {
-      "id": "door_2",
-      "type": "door",
-      "bbox": {
-        "x": 720.0,
-        "y": 137.0,
-        "width": 87.0,
-        "height": 27.0
-      },
-      "wall_id": "wall_16",
-      "height": 2.1,
-      "methods": [
-        "DL",
-        "Wall-aligned",
-        "Junctions"
-      ],
-      "junctions": {
-        "left": {
-          "junction_id": 15,
-          "junction_name": "J15",
-          "junction_type": "wall_intersection",
-          "x": 718.0,
-          "y": 150.0,
-          "distance": 2.0615528128088303
-        },
-        "right": {
-          "junction_id": 22,
-          "junction_name": "J22",
-          "junction_type": "wall_end",
-          "x": 806.0,
-          "y": 150.0,
-          "distance": 1.118033988749895
-        },
-        "up": {
-          "junction_id": 22,
-          "junction_name": "J22",
-          "junction_type": "wall_end",
-          "x": 806.0,
-          "y": 150.0,
-          "distance": 44.44378471732578
-        },
-        "down": {
-          "junction_id": 22,
-          "junction_name": "J22",
-          "junction_type": "wall_end",
-          "x": 806.0,
-          "y": 150.0,
-          "distance": 44.746508243660756
-        }
-      },
-      "confidence": {
-        "door_prob": 0.9834486842155457,
-        "window_prob": 0.00399630656465888
-      }
-    },
-    {
-      "id": "door_3",
-      "type": "door",
-      "bbox": {
-        "x": 277.0,
-        "y": 965.0,
-        "width": 92.0,
-        "height": 26.0
-      },
-      "wall_id": null,
-      "height": 2.1,
-      "methods": [
-        "DL",
-        "Junctions"
-      ],
-      "junctions": {
-        "left": {
-          "junction_id": 18,
-          "junction_name": "J18",
-          "junction_type": "wall_intersection",
-          "x": 278.0,
-          "y": 978.0,
-          "distance": 1.0
-        },
-        "right": {
-          "junction_id": 25,
-          "junction_name": "J25",
-          "junction_type": "wall_end",
-          "x": 368.0,
-          "y": 976.0,
+          "x": 821.0,
+          "y": 1090.0,
           "distance": 2.23606797749979
         },
-        "up": {
-          "junction_id": 25,
-          "junction_name": "J25",
+        "right": {
+          "junction_id": 27,
+          "junction_name": "J27",
           "junction_type": "wall_end",
-          "x": 368.0,
-          "y": 976.0,
-          "distance": 46.32493928760188
-        },
-        "down": {
-          "junction_id": 18,
-          "junction_name": "J18",
-          "junction_type": "wall_intersection",
-          "x": 278.0,
-          "y": 978.0,
-          "distance": 46.84015371452148
+          "x": 1046.0,
+          "y": 1091.0,
+          "distance": 1.4142135623730951
         }
       },
       "confidence": {
-        "door_prob": 0.9892755150794983,
-        "window_prob": 0.00042110614595003426
+        "window_prob": 0.9405709505081177,
+        "door_prob": 0.0011070928303524852
       }
     },
     {
       "id": "door_4",
       "type": "door",
       "bbox": {
-        "x": 774.0,
+        "x": 774.5,
         "y": 812.0,
-        "width": 23.0,
+        "width": 22.0,
         "height": 91.0
       },
       "wall_id": "wall_7",
@@ -1763,9 +1880,9 @@
       "id": "door_6",
       "type": "door",
       "bbox": {
-        "x": 603.0,
+        "x": 603.5,
         "y": 657.0,
-        "width": 23.0,
+        "width": 22.0,
         "height": 71.0
       },
       "wall_id": "wall_13",

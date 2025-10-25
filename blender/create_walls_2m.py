@@ -1159,10 +1159,10 @@ def create_external_normals_json(junctions, wall_segments_from_openings, wall_se
             wall_dir_y /= wall_len
 
         # Нормаль = поворот direction на 90° вправо (туда где улица)
-        # Система координат: Y растёт вниз (как в изображениях), X инвертирован в Blender (влево = +X)
-        # Поворот вправо в системе с Y-вниз: (x, y) -> (-y, x)
-        # Инверсия X для Blender: normal_x = -(-y) = y
-        normal = [wall_dir_y, wall_dir_x, 0]
+        # Система координат: Y растёт вниз (как в изображениях)
+        # Поворот вправо в системе с Y-вниз: (x, y) -> (y, -x)
+        # X-координаты уже инвертированы в JSON, поэтому не инвертируем X в нормали
+        normal = [wall_dir_y, -wall_dir_x, 0]
 
         # Округляем до основных направлений (1,0,0) или (0,1,0) или (-1,0,0) или (0,-1,0)
         abs_x = abs(normal[0])
@@ -1446,23 +1446,24 @@ def apply_external_side_material(wall_obj, external_side_info, wall_height, segm
     # Определяем, какая сторона является уличной (вся поверхность)
     target_normal = Vector(external_side_info["normal_direction"])
     target_normal.normalize()
-    
+
     # Применяем материалы к соответствующим граням
     for face in mesh.polygons:
-        # Определяем, является ли грань уличной
+        # Определяем нормаль грани
         face_normal = face.normal.copy()
         face_normal.normalize()
-        
-        # Проверяем, является ли грань уличной (с учетом погрешности)
+
+        # Проверяем, является ли грань ВНУТРЕННЕЙ (противоположной уличной)
         dot_product = face_normal.dot(target_normal)
-        is_external_face = dot_product > 0.7  # Порог для определения уличной грани
-        
+        is_internal_face = dot_product < -0.7  # Противоположное направление = внутренняя сторона
+
         # Применяем соответствующий материал
-        if is_external_face:
-            face.material_index = 0  # Желтый материал
+        # Серый только для внутренней стороны, все остальные (уличная, верх, низ, боковые) - желтый
+        if is_internal_face:
+            face.material_index = 1  # Серый материал (внутренняя сторона)
         else:
-            face.material_index = 1  # Серый материал
-    
+            face.material_index = 0  # Желтый материал (уличная + все остальные стороны)
+
     # Применяем материалы к объекту
     wall_obj.data.materials.append(yellow_mat)
     wall_obj.data.materials.append(gray_mat)
@@ -1500,20 +1501,21 @@ def apply_external_side_material_to_fill(fill_obj, external_side_info, fill_heig
     
     # Применяем материалы к соответствующим граням
     for face in mesh.polygons:
-        # Определяем, является ли грань уличной
+        # Определяем нормаль грани
         face_normal = face.normal.copy()
         face_normal.normalize()
-        
-        # Проверяем, является ли грань уличной (с учетом погрешности)
+
+        # Проверяем, является ли грань ВНУТРЕННЕЙ (противоположной уличной)
         dot_product = face_normal.dot(target_normal)
-        is_external_face = dot_product > 0.7  # Порог для определения уличной грани
-        
+        is_internal_face = dot_product < -0.7  # Противоположное направление = внутренняя сторона
+
         # Применяем соответствующий материал
-        if is_external_face:
-            face.material_index = 0  # Желтый материал
+        # Серый только для внутренней стороны, все остальные (уличная, верх, низ, боковые) - желтый
+        if is_internal_face:
+            face.material_index = 1  # Серый материал (внутренняя сторона)
         else:
-            face.material_index = 1  # Серый материал
-    
+            face.material_index = 0  # Желтый материал (уличная + все остальные стороны)
+
     # Применяем материалы к объекту
     fill_obj.data.materials.append(yellow_mat)
     fill_obj.data.materials.append(gray_mat)
@@ -1862,57 +1864,56 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     bpy.context.collection.objects.link(obj)
     
     # Применяем материал в зависимости от типа стены
-    if is_external:
-        if external_side_info:
-            # Применяем желтый цвет только к уличной стороне
-            apply_external_side_material(obj, external_side_info, wall_height, segment_data['segment_id'])
-            print(f"    ВНЕШНЯЯ СТЕНА с уличной стороной {external_side_info['face']}: {segment_data['segment_id']}")
+    if is_external and external_side_info:
+        # Применяем материалы с учетом нормалей: желтый для уличной стороны, серый для внутренней
+        apply_external_side_material(obj, external_side_info, wall_height, segment_data['segment_id'])
+        print(f"    ВНЕШНЯЯ СТЕНА (желтая снаружи, серая внутри): {segment_data['segment_id']}")
+    elif is_external:
+        # Если нет информации о нормалях, применяем желтый цвет ко всем сторонам
+        yellow_mat = bpy.data.materials.new(name="ExternalWallMaterial")
+        yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+        yellow_mat.use_nodes = True
+
+        # Настраиваем материал для лучшей видимости
+        nodes = yellow_mat.node_tree.nodes
+        links = yellow_mat.node_tree.links
+
+        # Очищаем стандартные узлы
+        nodes.clear()
+
+        # Создаем основные узлы
+        output_node = nodes.new(type='ShaderNodeOutputMaterial')
+        principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+
+        # Настраиваем эмиссию для лучшей видимости
+        principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
+
+        # Проверяем наличие входов эмиссии (зависит от версии Blender)
+        if 'Emission' in principled_bsdf.inputs:
+            principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
+            if 'Emission Strength' in principled_bsdf.inputs:
+                principled_bsdf.inputs['Emission Strength'].default_value = 0.5  # Умеренная сила эмиссии
         else:
-            # Если нет информации о стороне, красим всю стену (текущее поведение)
-            yellow_mat = bpy.data.materials.new(name="ExternalWallMaterial")
-            yellow_mat.diffuse_color = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-            yellow_mat.use_nodes = True
-            
-            # Настраиваем материал для лучшей видимости
-            nodes = yellow_mat.node_tree.nodes
-            links = yellow_mat.node_tree.links
-            
-            # Очищаем стандартные узлы
-            nodes.clear()
-            
-            # Создаем основные узлы
-            output_node = nodes.new(type='ShaderNodeOutputMaterial')
-            principled_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-            
-            # Настраиваем эмиссию для лучшей видимости
+            # Если входа эмиссии нет, используем только базовый цвет
             principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-            
-            # Проверяем наличие входов эмиссии (зависит от версии Blender)
-            if 'Emission' in principled_bsdf.inputs:
-                principled_bsdf.inputs['Emission'].default_value = (1.0, 1.0, 0.0, 1.0)  # Желтая эмиссия
-                if 'Emission Strength' in principled_bsdf.inputs:
-                    principled_bsdf.inputs['Emission Strength'].default_value = 0.5  # Умеренная сила эмиссии
-            else:
-                # Если входа эмиссии нет, используем только базовый цвет
-                principled_bsdf.inputs['Base Color'].default_value = (1.0, 1.0, 0.0, 1.0)  # Ярко-желтый
-                # Увеличиваем шероховатость для лучшей видимости
-                if 'Roughness' in principled_bsdf.inputs:
-                    principled_bsdf.inputs['Roughness'].default_value = 0.8
-            
-            # Соединяем узлы
-            links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
-            
-            if obj.data.materials:
-                obj.data.materials[0] = yellow_mat
-            else:
-                obj.data.materials.append(yellow_mat)
-                
-            print(f"    ВНЕШНЯЯ СТЕНА (полностью желтая): {segment_data['segment_id']}")
+            # Увеличиваем шероховатость для лучшей видимости
+            if 'Roughness' in principled_bsdf.inputs:
+                principled_bsdf.inputs['Roughness'].default_value = 0.8
+
+        # Соединяем узлы
+        links.new(principled_bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+
+        if obj.data.materials:
+            obj.data.materials[0] = yellow_mat
+        else:
+            obj.data.materials.append(yellow_mat)
+
+        print(f"    ВНЕШНЯЯ СТЕНА (полностью желтая, нет данных о нормалях): {segment_data['segment_id']}")
     else:
         # Внутренняя стена или стандартный материал
         mat = bpy.data.materials.new(name="InternalWallMaterial")
         mat.diffuse_color = (0.8, 0.8, 0.8, 1.0)  # Светло-серый
-        
+
         if obj.data.materials:
             obj.data.materials[0] = mat
         else:
@@ -1920,24 +1921,27 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     
     return obj
 
-def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False):
+def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False, wall_obj=None, wall_bounds=None, neighbor_bounds=None):
     """
     Создает 3D меш для проема (окна или двери) используя точные координаты из JSON
     без расширения за счет толщины стен, чтобы проемы были вертикальными без углублений
-    
+
     Args:
         opening_data: данные проема из JSON
         wall_height: высота стены
         wall_thickness: толщина стены
         scale_factor: масштабный коэффициент
         is_external: является ли проем внешним (для выбора материала)
+        wall_obj: объект стены для получения точной толщины
+        wall_bounds: dict с общим диапазоном координат всех связанных стен (x_min, x_max, y_min, y_max)
+        neighbor_bounds: dict с координатами соседних проемов для закрытия зазоров (left/right для horizontal, bottom/top для vertical)
     """
     bbox = opening_data["bbox"]
     orientation = opening_data.get("orientation", "horizontal")
-    
+
     # Создаем меш для проема
     bm = bmesh.new()
-    
+
     # Используем значения из JSON вместо вычисляемых пропорций
     if "bottom_height" in opening_data and "opening_height" in opening_data:
         opening_bottom = opening_data["bottom_height"]
@@ -1951,38 +1955,143 @@ def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=
         else:  # window
             opening_height = wall_height * 0.6  # Высота окна - 60% от высоты стены
             opening_bottom = wall_height * 0.3  # Высота от пола до низа окна - 30% от высоты стены
-    
+
+    # Используем wall_bounds если передан, иначе получаем из wall_obj
+    wall_x_min = None
+    wall_x_max = None
+    wall_y_min = None
+    wall_y_max = None
+
+    if wall_bounds:
+        # Используем предвычисленные границы всех стен
+        wall_x_min = wall_bounds['x_min']
+        wall_x_max = wall_bounds['x_max']
+        wall_y_min = wall_bounds['y_min']
+        wall_y_max = wall_bounds['y_max']
+    elif wall_obj and wall_obj.data.vertices:
+        # Извлекаем min/max координаты одной стены
+        wall_verts = wall_obj.data.vertices
+        wall_x_coords = [v.co.x for v in wall_verts]
+        wall_y_coords = [v.co.y for v in wall_verts]
+        wall_x_min = min(wall_x_coords)
+        wall_x_max = max(wall_x_coords)
+        wall_y_min = min(wall_y_coords)
+        wall_y_max = max(wall_y_coords)
+
+    # Порог для автоматического закрытия малых зазоров
+    GAP_THRESHOLD = 0.02  # 2см
+
     if orientation == "horizontal":
-        # Горизонтальный проем (окно или дверь)
-        x = bbox["x"] * scale_factor
-        y = bbox["y"] * scale_factor
-        width = bbox["width"] * scale_factor
-        height = bbox["height"] * scale_factor
-        
-        # Создаем куб для проема без расширения
+        # Горизонтальный проем: X из bbox (позиция), Y из стен (толщина)
+        x = bbox["x"] * scale_factor  # Позиция из bbox
+        width = bbox["width"] * scale_factor  # Ширина из bbox
+
+        # Автоматически расширяем до близких границ соседей или стен (закрываем малые зазоры)
+        # Приоритет: сначала соседние проемы, затем границы стен
+
+        # Проверяем левый край
+        if neighbor_bounds and 'left' in neighbor_bounds and neighbor_bounds['left'] is not None:
+            # Есть сосед слева - расширяемся до него (зазор уже проверен при поиске)
+            gap_left = x - neighbor_bounds['left']
+            if gap_left > 0:
+                print(f"    Проем: закрываем зазор слева до соседа {gap_left*1000:.1f}мм: с {x:.3f}м до {neighbor_bounds['left']:.3f}м")
+                width += gap_left
+                x = neighbor_bounds['left']
+        elif wall_x_min is not None:
+            # Нет соседа, проверяем границу стены
+            gap_left = x - wall_x_min
+            if 0 < gap_left < GAP_THRESHOLD:
+                print(f"    Проем: закрываем зазор слева до стены {gap_left*1000:.1f}мм: с {x:.3f}м до {wall_x_min:.3f}м")
+                width += gap_left
+                x = wall_x_min
+
+        # Проверяем правый край
+        x_end = x + width
+        if neighbor_bounds and 'right' in neighbor_bounds and neighbor_bounds['right'] is not None:
+            # Есть сосед справа - расширяемся до него (зазор уже проверен при поиске)
+            gap_right = neighbor_bounds['right'] - x_end
+            if gap_right > 0:
+                print(f"    Проем: закрываем зазор справа до соседа {gap_right*1000:.1f}мм: с {x_end:.3f}м до {neighbor_bounds['right']:.3f}м")
+                width += gap_right
+        elif wall_x_max is not None:
+            # Нет соседа, проверяем границу стены
+            gap_right = wall_x_max - x_end
+            if 0 < gap_right < GAP_THRESHOLD:
+                print(f"    Проем: закрываем зазор справа до стены {gap_right*1000:.1f}мм: с {x_end:.3f}м до {wall_x_max:.3f}м")
+                width += gap_right
+
+        # Толщина из стены по Y
+        if wall_y_min is not None and wall_y_max is not None:
+            y = wall_y_min
+            height = wall_y_max - wall_y_min
+        else:
+            y = bbox["y"] * scale_factor
+            height = bbox["height"] * scale_factor
+
+        # Создаем куб для проема
         v1 = bm.verts.new((x, y, opening_bottom))
         v2 = bm.verts.new((x + width, y, opening_bottom))
         v3 = bm.verts.new((x + width, y + height, opening_bottom))
         v4 = bm.verts.new((x, y + height, opening_bottom))
-        
+
         v5 = bm.verts.new((x, y, opening_bottom + opening_height))
         v6 = bm.verts.new((x + width, y, opening_bottom + opening_height))
         v7 = bm.verts.new((x + width, y + height, opening_bottom + opening_height))
         v8 = bm.verts.new((x, y + height, opening_bottom + opening_height))
-        
+
     else:  # vertical
-        # Вертикальный проем
-        x = bbox["x"] * scale_factor
-        y = bbox["y"] * scale_factor
-        width = bbox["width"] * scale_factor
-        height = bbox["height"] * scale_factor
-        
-        # Создаем куб для проема без расширения
+        # Вертикальный проем: Y из bbox (позиция), X из стен (толщина)
+        y = bbox["y"] * scale_factor  # Позиция из bbox
+        height = bbox["height"] * scale_factor  # Высота из bbox
+
+        # Автоматически расширяем до близких границ соседей или стен (закрываем малые зазоры)
+        # Приоритет: сначала соседние проемы, затем границы стен
+
+        # Проверяем нижний край (bottom = меньшее Y)
+        if neighbor_bounds and 'bottom' in neighbor_bounds and neighbor_bounds['bottom'] is not None:
+            # Есть сосед снизу - расширяемся до него (зазор уже проверен при поиске)
+            gap_bottom = y - neighbor_bounds['bottom']
+            if gap_bottom > 0:
+                print(f"    Проем: закрываем зазор снизу до соседа {gap_bottom*1000:.1f}мм: с {y:.3f}м до {neighbor_bounds['bottom']:.3f}м")
+                height += gap_bottom
+                y = neighbor_bounds['bottom']
+        elif wall_y_min is not None:
+            # Нет соседа, проверяем границу стены
+            gap_bottom = y - wall_y_min
+            if 0 < gap_bottom < GAP_THRESHOLD:
+                print(f"    Проем: закрываем зазор снизу до стены {gap_bottom*1000:.1f}мм: с {y:.3f}м до {wall_y_min:.3f}м")
+                height += gap_bottom
+                y = wall_y_min
+
+        # Проверяем верхний край (top = большее Y)
+        y_end = y + height
+        if neighbor_bounds and 'top' in neighbor_bounds and neighbor_bounds['top'] is not None:
+            # Есть сосед сверху - расширяемся до него (зазор уже проверен при поиске)
+            gap_top = neighbor_bounds['top'] - y_end
+            if gap_top > 0:
+                print(f"    Проем: закрываем зазор сверху до соседа {gap_top*1000:.1f}мм: с {y_end:.3f}м до {neighbor_bounds['top']:.3f}м")
+                height += gap_top
+        elif wall_y_max is not None:
+            # Нет соседа, проверяем границу стены
+            gap_top = wall_y_max - y_end
+            if 0 < gap_top < GAP_THRESHOLD:
+                print(f"    Проем: закрываем зазор сверху до стены {gap_top*1000:.1f}мм: с {y_end:.3f}м до {wall_y_max:.3f}м")
+                height += gap_top
+
+        # Толщина из стены по X
+        if wall_x_min is not None and wall_x_max is not None:
+            x = wall_x_min
+            width = wall_x_max - wall_x_min
+        else:
+            x = bbox["x"] * scale_factor
+            width = bbox["width"] * scale_factor
+
+        # Создаем куб для проема
         v1 = bm.verts.new((x, y, opening_bottom))
         v2 = bm.verts.new((x + width, y, opening_bottom))
         v3 = bm.verts.new((x + width, y + height, opening_bottom))
         v4 = bm.verts.new((x, y + height, opening_bottom))
-        
+
         v5 = bm.verts.new((x, y, opening_bottom + opening_height))
         v6 = bm.verts.new((x + width, y, opening_bottom + opening_height))
         v7 = bm.verts.new((x + width, y + height, opening_bottom + opening_height))
@@ -2093,10 +2202,10 @@ def create_pillar_mesh(pillar_data, wall_height, wall_thickness, scale_factor=1.
     
     return obj
 
-def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_factor=1.0, wall_obj=None, external_side_info=None):
+def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_factor=1.0, wall_obj=None, external_side_info=None, wall_bounds=None, neighbor_bounds=None):
     """
     Создает 3D-заполнение для проема (окна/двери) - над и под проемом на всю ширину проема
-    
+
     Args:
         opening_data: данные проема из JSON
         wall_height: высота стены в метрах
@@ -2104,7 +2213,9 @@ def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_fac
         scale_factor: масштабный коэффициент
         wall_obj: объект стены для интеграции через булевы операции
         external_side_info: информация об уличной стороне для правильного окрашивания
-    
+        wall_bounds: dict с общим диапазоном координат всех связанных стен (x_min, x_max, y_min, y_max)
+        neighbor_bounds: dict с координатами соседних проемов для закрытия зазоров (left/right для horizontal, bottom/top для vertical)
+
     Returns:
         list: список объектов заполнения (над и под проемом)
     """
@@ -2141,57 +2252,172 @@ def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_fac
     y = bbox["y"] * scale_factor
     width = bbox["width"] * scale_factor
     height = bbox["height"] * scale_factor
-    
-    print(f"    Координаты проема: x={x:.3f}, y={y:.3f}, ширина={width:.3f}, высота={height:.3f}")
-    
-    # Определяем реальные размеры заполнения на основе данных из JSON
-    # Используем полную ширину проема из JSON
+
+    print(f"    Координаты проема из bbox: x={x:.3f}, y={y:.3f}, ширина={width:.3f}, высота={height:.3f}")
+
+    # Используем wall_bounds если передан, иначе получаем из wall_obj
+    wall_x_min = None
+    wall_x_max = None
+    wall_y_min = None
+    wall_y_max = None
+
+    if wall_bounds:
+        # Используем предв компьютированные границы всех стен
+        wall_x_min = wall_bounds['x_min']
+        wall_x_max = wall_bounds['x_max']
+        wall_y_min = wall_bounds['y_min']
+        wall_y_max = wall_bounds['y_max']
+        print(f"    Используем общие границы стен: X=[{wall_x_min:.3f}, {wall_x_max:.3f}], Y=[{wall_y_min:.3f}, {wall_y_max:.3f}]")
+    elif wall_obj and wall_obj.data.vertices:
+        # Извлекаем min/max координаты одной стены
+        wall_verts = wall_obj.data.vertices
+        wall_x_coords = [v.co.x for v in wall_verts]
+        wall_y_coords = [v.co.y for v in wall_verts]
+        wall_x_min = min(wall_x_coords)
+        wall_x_max = max(wall_x_coords)
+        wall_y_min = min(wall_y_coords)
+        wall_y_max = max(wall_y_coords)
+        print(f"    Координаты одной стены: X=[{wall_x_min:.3f}, {wall_x_max:.3f}], Y=[{wall_y_min:.3f}, {wall_y_max:.3f}]")
+
+    # Определяем размеры заполнения:
+    # ВАЖНО: позиции проема из bbox, только толщина из стен
+    # + автоматическое закрытие малых зазоров (<2см) до соседних элементов
+    GAP_THRESHOLD = 0.02  # 2см - порог для автоматического закрытия зазоров
+
     if orientation == "horizontal":
-        fill_width = width  # Полная ширина проема
-        fill_depth = wall_thickness  # Толщина стены
-        fill_x = x  # Начальная позиция X
-        fill_y = y  # Начальная позиция Y
-        print(f"    Горизонтальный проем: заполнение шириной={fill_width:.3f}, глубиной={fill_depth:.3f}")
+        # Горизонтальный: X из bbox (позиция проема), Y из стен (толщина)
+        fill_x = x  # Позиция из bbox
+        fill_width = width  # Ширина из bbox
+
+        # Автоматически расширяем до близких границ соседей или стен (закрываем малые зазоры)
+        # Приоритет: сначала соседние проемы, затем границы стен
+
+        # Проверяем левый край
+        if neighbor_bounds and 'left' in neighbor_bounds and neighbor_bounds['left'] is not None:
+            # Есть сосед слева - расширяемся до него (зазор уже проверен при поиске)
+            gap_left = fill_x - neighbor_bounds['left']
+            if gap_left > 0:
+                print(f"    Закрываем зазор слева до соседа {gap_left*1000:.1f}мм: с {fill_x:.3f}м до {neighbor_bounds['left']:.3f}м")
+                fill_width += gap_left
+                fill_x = neighbor_bounds['left']
+        elif wall_x_min is not None:
+            # Нет соседа, проверяем границу стены
+            gap_left = fill_x - wall_x_min
+            if 0 < gap_left < GAP_THRESHOLD:
+                print(f"    Закрываем зазор слева до стены {gap_left*1000:.1f}мм: с {fill_x:.3f}м до {wall_x_min:.3f}м")
+                fill_width += gap_left
+                fill_x = wall_x_min
+
+        # Проверяем правый край
+        fill_x_end = fill_x + fill_width
+        if neighbor_bounds and 'right' in neighbor_bounds and neighbor_bounds['right'] is not None:
+            # Есть сосед справа - расширяемся до него (зазор уже проверен при поиске)
+            gap_right = neighbor_bounds['right'] - fill_x_end
+            if gap_right > 0:
+                print(f"    Закрываем зазор справа до соседа {gap_right*1000:.1f}мм: с {fill_x_end:.3f}м до {neighbor_bounds['right']:.3f}м")
+                fill_width += gap_right
+        elif wall_x_max is not None:
+            # Нет соседа, проверяем границу стены
+            gap_right = wall_x_max - fill_x_end
+            if 0 < gap_right < GAP_THRESHOLD:
+                print(f"    Закрываем зазор справа до стены {gap_right*1000:.1f}мм: с {fill_x_end:.3f}м до {wall_x_max:.3f}м")
+                fill_width += gap_right
+
+        # Толщина стены по Y из стен
+        if wall_y_min is not None and wall_y_max is not None:
+            fill_y = wall_y_min
+            fill_depth = wall_y_max - wall_y_min
+        else:
+            fill_y = y
+            fill_depth = wall_thickness
+        print(f"    Горизонтальный: X={fill_x:.3f}, ширина={fill_width:.3f}, Y={fill_y:.3f}, толщина={fill_depth:.3f}")
     else:  # vertical
-        fill_width = wall_thickness  # Толщина стены
-        fill_depth = height  # Полная высота проема в плане
-        fill_x = x  # Начальная позиция X
-        fill_y = y  # Начальная позиция Y
-        print(f"    Вертикальный проем: заполнение шириной={fill_width:.3f}, глубиной={fill_depth:.3f}")
+        # Вертикальный: Y из bbox (позиция проема), X из стен (толщина)
+        fill_y = y  # Позиция из bbox
+        fill_depth = height  # Высота из bbox
+
+        # Автоматически расширяем до близких границ соседей или стен (закрываем малые зазоры)
+        # Приоритет: сначала соседние проемы, затем границы стен
+
+        # Проверяем нижний край (bottom = меньшее Y)
+        if neighbor_bounds and 'bottom' in neighbor_bounds and neighbor_bounds['bottom'] is not None:
+            # Есть сосед снизу - расширяемся до него (зазор уже проверен при поиске)
+            gap_bottom = fill_y - neighbor_bounds['bottom']
+            if gap_bottom > 0:
+                print(f"    Закрываем зазор снизу до соседа {gap_bottom*1000:.1f}мм: с {fill_y:.3f}м до {neighbor_bounds['bottom']:.3f}м")
+                fill_depth += gap_bottom
+                fill_y = neighbor_bounds['bottom']
+        elif wall_y_min is not None:
+            # Нет соседа, проверяем границу стены
+            gap_bottom = fill_y - wall_y_min
+            if 0 < gap_bottom < GAP_THRESHOLD:
+                print(f"    Закрываем зазор снизу до стены {gap_bottom*1000:.1f}мм: с {fill_y:.3f}м до {wall_y_min:.3f}м")
+                fill_depth += gap_bottom
+                fill_y = wall_y_min
+
+        # Проверяем верхний край (top = большее Y)
+        fill_y_end = fill_y + fill_depth
+        if neighbor_bounds and 'top' in neighbor_bounds and neighbor_bounds['top'] is not None:
+            # Есть сосед сверху - расширяемся до него (зазор уже проверен при поиске)
+            gap_top = neighbor_bounds['top'] - fill_y_end
+            if gap_top > 0:
+                print(f"    Закрываем зазор сверху до соседа {gap_top*1000:.1f}мм: с {fill_y_end:.3f}м до {neighbor_bounds['top']:.3f}м")
+                fill_depth += gap_top
+        elif wall_y_max is not None:
+            # Нет соседа, проверяем границу стены
+            gap_top = wall_y_max - fill_y_end
+            if 0 < gap_top < GAP_THRESHOLD:
+                print(f"    Закрываем зазор сверху до стены {gap_top*1000:.1f}мм: с {fill_y_end:.3f}м до {wall_y_max:.3f}м")
+                fill_depth += gap_top
+
+        # Толщина стены по X из стен
+        if wall_x_min is not None and wall_x_max is not None:
+            fill_x = wall_x_min
+            fill_width = wall_x_max - wall_x_min
+        else:
+            fill_x = x
+            fill_width = wall_thickness
+        print(f"    Вертикальный: Y={fill_y:.3f}, высота={fill_depth:.3f}, X={fill_x:.3f}, толщина={fill_width:.3f}")
     
     # Шаг 1: Создаем заполнение ОТ 0 ДО НИЖНЕГО КРАЯ проема
     if opening_bottom > 0:
         fill_below_height = opening_bottom
-        fill_below_z = fill_below_height / 2
-        
+
         print(f"    Создание заполнения под проемом: высота={fill_below_height:.3f}м")
-        
-        # Создаем куб для заполнения под проемом
-        bpy.ops.mesh.primitive_cube_add(size=1.0)
-        fill_below_obj = bpy.context.active_object
-        fill_below_obj.name = f"Fill_Below_{opening_id}"
-        
-        # Масштабируем куб на полную ширину проема
-        # Используем полный размер без деления на 2
-        scale_x = fill_width
-        scale_y = fill_depth
-        scale_z = fill_below_height
-        fill_below_obj.scale = (scale_x, scale_y, scale_z)
-        
-        # Позиционируем центр куба
-        if orientation == "horizontal":
-            fill_below_obj.location = (fill_x + fill_width/2.0, fill_y + fill_depth/2.0, fill_below_z)
-        else:  # vertical
-            fill_below_obj.location = (fill_x + fill_width/2.0, fill_y + fill_depth/2.0, fill_below_z)
-        
-        # Добавляем UV-развертку для текстуры
+
+        # Создаем новый меш и объект
+        fill_below_mesh = bpy.data.meshes.new(f"Fill_Below_{opening_id}_Mesh")
+        fill_below_obj = bpy.data.objects.new(f"Fill_Below_{opening_id}", fill_below_mesh)
+        bpy.context.collection.objects.link(fill_below_obj)
+
+        # Создаем меш через bmesh для точного позиционирования
         bm = bmesh.new()
-        bm.from_mesh(fill_below_obj.data)
-        
-        # Создаем UV-слой
+
+        # Создаем вершины куба с точными координатами (как у стен)
+        # Нижняя грань (Z=0)
+        v1 = bm.verts.new((fill_x, fill_y, 0))
+        v2 = bm.verts.new((fill_x + fill_width, fill_y, 0))
+        v3 = bm.verts.new((fill_x + fill_width, fill_y + fill_depth, 0))
+        v4 = bm.verts.new((fill_x, fill_y + fill_depth, 0))
+
+        # Верхняя грань (Z=fill_below_height)
+        v5 = bm.verts.new((fill_x, fill_y, fill_below_height))
+        v6 = bm.verts.new((fill_x + fill_width, fill_y, fill_below_height))
+        v7 = bm.verts.new((fill_x + fill_width, fill_y + fill_depth, fill_below_height))
+        v8 = bm.verts.new((fill_x, fill_y + fill_depth, fill_below_height))
+
+        # Создаем грани
+        bm.faces.new((v1, v2, v3, v4))  # Нижняя
+        bm.faces.new((v5, v6, v7, v8))  # Верхняя
+        bm.faces.new((v1, v2, v6, v5))  # Передняя
+        bm.faces.new((v4, v3, v7, v8))  # Задняя
+        bm.faces.new((v1, v5, v8, v4))  # Левая
+        bm.faces.new((v2, v3, v7, v6))  # Правая
+
+        # Добавляем UV-развертку
         bm.loops.layers.uv.new()
         uv_layer = bm.loops.layers.uv.active
-        
+
         # Для каждой грани создаем UV-координаты
         for face in bm.faces:
             # Определяем ориентацию грани для правильного наложения текстуры
@@ -2219,12 +2445,12 @@ def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_fac
                 face.loops[1][uv_layer].uv = (fill_depth/10, 0)
                 face.loops[2][uv_layer].uv = (fill_depth/10, fill_below_height/10)
                 face.loops[3][uv_layer].uv = (0, fill_below_height/10)
-        
+
         # Обновляем нормали
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-        
+
         # Применяем изменения к мешу
-        bm.to_mesh(fill_below_obj.data)
+        bm.to_mesh(fill_below_mesh)
         bm.free()
         
         # Применяем материалы с учетом уличной стороны
@@ -2290,36 +2516,44 @@ def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_fac
     # Шаг 2: Создаем заполнение ОТ ВЕРХНЕГО КРАЯ проема ДО ПОТОЛКА
     if opening_bottom + opening_height < wall_height:
         fill_above_height = wall_height - (opening_bottom + opening_height)
-        fill_above_z = opening_bottom + opening_height + fill_above_height / 2
-        
+        fill_above_z_bottom = opening_bottom + opening_height  # Нижняя грань заполнения
+        fill_above_z_top = wall_height  # Верхняя грань заполнения
+
         print(f"    Создание заполнения над проемом: высота={fill_above_height:.3f}м")
-        
-        # Создаем куб для заполнения над проемом
-        bpy.ops.mesh.primitive_cube_add(size=1.0)
-        fill_above_obj = bpy.context.active_object
-        fill_above_obj.name = f"Fill_Above_{opening_id}"
-        
-        # Масштабируем куб на полную ширину проема
-        # Используем полный размер без деления на 2
-        scale_x = fill_width
-        scale_y = fill_depth
-        scale_z = fill_above_height
-        fill_above_obj.scale = (scale_x, scale_y, scale_z)
-        
-        # Позиционируем центр куба
-        if orientation == "horizontal":
-            fill_above_obj.location = (fill_x + fill_width/2.0, fill_y + fill_depth/2.0, fill_above_z)
-        else:  # vertical
-            fill_above_obj.location = (fill_x + fill_width/2.0, fill_y + fill_depth/2.0, fill_above_z)
-        
-        # Добавляем UV-развертку для текстуры
+
+        # Создаем новый меш и объект
+        fill_above_mesh = bpy.data.meshes.new(f"Fill_Above_{opening_id}_Mesh")
+        fill_above_obj = bpy.data.objects.new(f"Fill_Above_{opening_id}", fill_above_mesh)
+        bpy.context.collection.objects.link(fill_above_obj)
+
+        # Создаем меш через bmesh для точного позиционирования
         bm = bmesh.new()
-        bm.from_mesh(fill_above_obj.data)
-        
-        # Создаем UV-слой
+
+        # Создаем вершины куба с точными координатами (как у стен)
+        # Нижняя грань (Z=fill_above_z_bottom)
+        v1 = bm.verts.new((fill_x, fill_y, fill_above_z_bottom))
+        v2 = bm.verts.new((fill_x + fill_width, fill_y, fill_above_z_bottom))
+        v3 = bm.verts.new((fill_x + fill_width, fill_y + fill_depth, fill_above_z_bottom))
+        v4 = bm.verts.new((fill_x, fill_y + fill_depth, fill_above_z_bottom))
+
+        # Верхняя грань (Z=fill_above_z_top)
+        v5 = bm.verts.new((fill_x, fill_y, fill_above_z_top))
+        v6 = bm.verts.new((fill_x + fill_width, fill_y, fill_above_z_top))
+        v7 = bm.verts.new((fill_x + fill_width, fill_y + fill_depth, fill_above_z_top))
+        v8 = bm.verts.new((fill_x, fill_y + fill_depth, fill_above_z_top))
+
+        # Создаем грани
+        bm.faces.new((v1, v2, v3, v4))  # Нижняя
+        bm.faces.new((v5, v6, v7, v8))  # Верхняя
+        bm.faces.new((v1, v2, v6, v5))  # Передняя
+        bm.faces.new((v4, v3, v7, v8))  # Задняя
+        bm.faces.new((v1, v5, v8, v4))  # Левая
+        bm.faces.new((v2, v3, v7, v6))  # Правая
+
+        # Добавляем UV-развертку
         bm.loops.layers.uv.new()
         uv_layer = bm.loops.layers.uv.active
-        
+
         # Для каждой грани создаем UV-координаты
         for face in bm.faces:
             # Определяем ориентацию грани для правильного наложения текстуры
@@ -2347,12 +2581,12 @@ def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_fac
                 face.loops[1][uv_layer].uv = (fill_depth/10, 0)
                 face.loops[2][uv_layer].uv = (fill_depth/10, fill_above_height/10)
                 face.loops[3][uv_layer].uv = (0, fill_above_height/10)
-        
+
         # Обновляем нормали
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-        
+
         # Применяем изменения к мешу
-        bm.to_mesh(fill_above_obj.data)
+        bm.to_mesh(fill_above_mesh)
         bm.free()
         
         # Применяем материалы с учетом уличной стороны
@@ -2457,33 +2691,161 @@ def create_fill_walls_between_openings(wall_segments, openings, wall_thickness, 
         opening_orientation = opening.get("orientation", "horizontal")
         
         print(f"Обработка проема {i+1}/{len(openings)}: {opening_id} (тип: {opening_type}, ориентация: {opening_orientation})")
-        
-        # Ищем соответствующую стену для проема
-        related_wall = None
-        
+
+        # Ищем ВСЕ стены связанные с проемом (для устранения зазоров)
+        related_walls = []
+
         if wall_objects:
-            # Простая эвристика: находим стену, которая пересекается с проемом
+            # Находим все стены, которые пересекаются с проемом
             # Создаем временный объект проема для проверки пересечения
             temp_opening = create_opening_mesh(opening, wall_height, wall_thickness, scale_factor)
             if temp_opening:
                 for wall_obj in wall_objects:
                     if check_wall_opening_intersection(wall_obj, temp_opening):
-                        related_wall = wall_obj
-                        print(f"  Найдена соответствующая стена: {wall_obj.name}")
-                        break
-                
-                if not related_wall:
-                    print(f"  Предупреждение: не найдена соответствующая стена для проема {opening_id}")
-                
+                        related_walls.append(wall_obj)
+                        print(f"  Найдена связанная стена: {wall_obj.name}")
+
+                if not related_walls:
+                    print(f"  Предупреждение: не найдены стены для проема {opening_id}")
+                else:
+                    print(f"  Всего найдено стен: {len(related_walls)}")
+
                 # Удаляем временный объект проема
                 bpy.data.objects.remove(temp_opening, do_unlink=True)
         else:
             print(f"  Предупреждение: отсутствуют объекты стен для проема {opening_id}")
+
+        # Вычисляем общий диапазон координат всех связанных стен
+        wall_bounds = None
+        if related_walls:
+            all_x_coords = []
+            all_y_coords = []
+            for wall_obj in related_walls:
+                if wall_obj.data.vertices:
+                    all_x_coords.extend([v.co.x for v in wall_obj.data.vertices])
+                    all_y_coords.extend([v.co.y for v in wall_obj.data.vertices])
+
+            if all_x_coords and all_y_coords:
+                wall_bounds = {
+                    'x_min': min(all_x_coords),
+                    'x_max': max(all_x_coords),
+                    'y_min': min(all_y_coords),
+                    'y_max': max(all_y_coords)
+                }
+                print(f"  Общий диапазон стен: X=[{wall_bounds['x_min']:.3f}, {wall_bounds['x_max']:.3f}], Y=[{wall_bounds['y_min']:.3f}, {wall_bounds['y_max']:.3f}]")
+
+        # Для обратной совместимости - берем первую стену
+        related_wall = related_walls[0] if related_walls else None
         
         # Используем ориентацию проема непосредственно из данных JSON
         # Это гарантирует правильное определение ориентации для заполнения
         print(f"  Используем ориентацию проема из JSON: {opening_orientation}")
-        
+
+        # Ищем соседние проемы на той же линии для автоматического закрытия зазоров
+        GAP_THRESHOLD = 0.02  # 2см порог
+        neighbor_bounds = None
+
+        bbox = opening.get("bbox", {})
+        if bbox and opening_orientation == "horizontal":
+            # Для горизонтальных проемов ищем соседей слева и справа
+            current_x = bbox["x"] * scale_factor
+            current_width = bbox["width"] * scale_factor
+            current_x_end = current_x + current_width
+            current_y = bbox["y"] * scale_factor
+
+            left_neighbor_x = None
+            right_neighbor_x = None
+
+            # Проверяем все другие проемы
+            for other_opening in openings:
+                if other_opening.get("id") == opening_id:
+                    continue
+
+                other_bbox = other_opening.get("bbox", {})
+                other_orientation = other_opening.get("orientation", "horizontal")
+
+                if other_bbox and other_orientation == "horizontal":
+                    other_y = other_bbox["y"] * scale_factor
+
+                    # Проверяем, что на той же линии (похожие Y координаты)
+                    if abs(other_y - current_y) < 0.05:  # 5см толеранс
+                        other_x = other_bbox["x"] * scale_factor
+                        other_width = other_bbox["width"] * scale_factor
+                        other_x_end = other_x + other_width
+
+                        # Проверяем, находится ли слева
+                        if other_x_end <= current_x:
+                            gap = current_x - other_x_end
+                            if gap < GAP_THRESHOLD:
+                                if left_neighbor_x is None or other_x_end > left_neighbor_x:
+                                    left_neighbor_x = other_x_end
+                                    print(f"  Найден левый сосед: {other_opening.get('id')}, зазор={gap*1000:.1f}мм")
+
+                        # Проверяем, находится ли справа
+                        elif other_x >= current_x_end:
+                            gap = other_x - current_x_end
+                            if gap < GAP_THRESHOLD:
+                                if right_neighbor_x is None or other_x < right_neighbor_x:
+                                    right_neighbor_x = other_x
+                                    print(f"  Найден правый сосед: {other_opening.get('id')}, зазор={gap*1000:.1f}мм")
+
+            # Формируем neighbor_bounds
+            if left_neighbor_x is not None or right_neighbor_x is not None:
+                neighbor_bounds = {
+                    'left': left_neighbor_x,
+                    'right': right_neighbor_x
+                }
+
+        elif bbox and opening_orientation == "vertical":
+            # Для вертикальных проемов ищем соседей сверху и снизу
+            current_y = bbox["y"] * scale_factor
+            current_height = bbox["height"] * scale_factor
+            current_y_end = current_y + current_height
+            current_x = bbox["x"] * scale_factor
+
+            bottom_neighbor_y = None
+            top_neighbor_y = None
+
+            # Проверяем все другие проемы
+            for other_opening in openings:
+                if other_opening.get("id") == opening_id:
+                    continue
+
+                other_bbox = other_opening.get("bbox", {})
+                other_orientation = other_opening.get("orientation", "horizontal")
+
+                if other_bbox and other_orientation == "vertical":
+                    other_x = other_bbox["x"] * scale_factor
+
+                    # Проверяем, что на той же линии (похожие X координаты)
+                    if abs(other_x - current_x) < 0.05:  # 5см толеранс
+                        other_y = other_bbox["y"] * scale_factor
+                        other_height = other_bbox["height"] * scale_factor
+                        other_y_end = other_y + other_height
+
+                        # Проверяем, находится ли снизу
+                        if other_y_end <= current_y:
+                            gap = current_y - other_y_end
+                            if gap < GAP_THRESHOLD:
+                                if bottom_neighbor_y is None or other_y_end > bottom_neighbor_y:
+                                    bottom_neighbor_y = other_y_end
+                                    print(f"  Найден нижний сосед: {other_opening.get('id')}, зазор={gap*1000:.1f}мм")
+
+                        # Проверяем, находится ли сверху
+                        elif other_y >= current_y_end:
+                            gap = other_y - current_y_end
+                            if gap < GAP_THRESHOLD:
+                                if top_neighbor_y is None or other_y < top_neighbor_y:
+                                    top_neighbor_y = other_y
+                                    print(f"  Найден верхний сосед: {other_opening.get('id')}, зазор={gap*1000:.1f}мм")
+
+            # Формируем neighbor_bounds
+            if bottom_neighbor_y is not None or top_neighbor_y is not None:
+                neighbor_bounds = {
+                    'bottom': bottom_neighbor_y,
+                    'top': top_neighbor_y
+                }
+
         # Создаем заполнение для проема с ориентацией из данных проема
         # Копируем данные проема, чтобы не изменять оригинал
         opening_copy = opening.copy()
@@ -2507,7 +2869,9 @@ def create_fill_walls_between_openings(wall_segments, openings, wall_thickness, 
             wall_thickness,
             scale_factor,
             related_wall,
-            external_side_info
+            external_side_info,
+            wall_bounds,
+            neighbor_bounds
         )
         
         if fill_objects:
@@ -3099,10 +3463,143 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         opening_objects = []
         external_openings_count = 0
         internal_openings_count = 0
-        
+
         for opening in openings:
             is_ext = is_external_opening(opening, external_opening_ids)
-            opening_obj = create_opening_mesh(opening, wall_height_meters, wall_thickness, scale_factor, is_external=is_ext)
+
+            # Находим ВСЕ стены связанные с проемом
+            related_walls = []
+            opening_id = opening.get("id", "unknown")
+            for wall_obj in wall_objects:
+                # Проверяем совпадение по opening_id в имени стены
+                if opening_id in wall_obj.name:
+                    related_walls.append(wall_obj)
+
+            # Вычисляем общий диапазон координат всех связанных стен
+            wall_bounds = None
+            if related_walls:
+                all_x_coords = []
+                all_y_coords = []
+                for wall_obj in related_walls:
+                    if wall_obj.data.vertices:
+                        all_x_coords.extend([v.co.x for v in wall_obj.data.vertices])
+                        all_y_coords.extend([v.co.y for v in wall_obj.data.vertices])
+
+                if all_x_coords and all_y_coords:
+                    wall_bounds = {
+                        'x_min': min(all_x_coords),
+                        'x_max': max(all_x_coords),
+                        'y_min': min(all_y_coords),
+                        'y_max': max(all_y_coords)
+                    }
+
+            # Для обратной совместимости
+            related_wall = related_walls[0] if related_walls else None
+
+            # Ищем соседние проемы на той же линии для автоматического закрытия зазоров
+            GAP_THRESHOLD = 0.02  # 2см порог
+            neighbor_bounds = None
+
+            bbox = opening.get("bbox", {})
+            opening_orientation = opening.get("orientation", "horizontal")
+
+            if bbox and opening_orientation == "horizontal":
+                # Для горизонтальных проемов ищем соседей слева и справа
+                current_x = bbox["x"] * scale_factor
+                current_width = bbox["width"] * scale_factor
+                current_x_end = current_x + current_width
+                current_y = bbox["y"] * scale_factor
+
+                left_neighbor_x = None
+                right_neighbor_x = None
+
+                # Проверяем все другие проемы
+                for other_opening in openings:
+                    if other_opening.get("id") == opening_id:
+                        continue
+
+                    other_bbox = other_opening.get("bbox", {})
+                    other_orientation = other_opening.get("orientation", "horizontal")
+
+                    if other_bbox and other_orientation == "horizontal":
+                        other_y = other_bbox["y"] * scale_factor
+
+                        # Проверяем, что на той же линии (похожие Y координаты)
+                        if abs(other_y - current_y) < 0.05:  # 5см толеранс
+                            other_x = other_bbox["x"] * scale_factor
+                            other_width = other_bbox["width"] * scale_factor
+                            other_x_end = other_x + other_width
+
+                            # Проверяем, находится ли слева
+                            if other_x_end <= current_x:
+                                gap = current_x - other_x_end
+                                if gap < GAP_THRESHOLD:
+                                    if left_neighbor_x is None or other_x_end > left_neighbor_x:
+                                        left_neighbor_x = other_x_end
+
+                            # Проверяем, находится ли справа
+                            elif other_x >= current_x_end:
+                                gap = other_x - current_x_end
+                                if gap < GAP_THRESHOLD:
+                                    if right_neighbor_x is None or other_x < right_neighbor_x:
+                                        right_neighbor_x = other_x
+
+                # Формируем neighbor_bounds
+                if left_neighbor_x is not None or right_neighbor_x is not None:
+                    neighbor_bounds = {
+                        'left': left_neighbor_x,
+                        'right': right_neighbor_x
+                    }
+
+            elif bbox and opening_orientation == "vertical":
+                # Для вертикальных проемов ищем соседей сверху и снизу
+                current_y = bbox["y"] * scale_factor
+                current_height = bbox["height"] * scale_factor
+                current_y_end = current_y + current_height
+                current_x = bbox["x"] * scale_factor
+
+                bottom_neighbor_y = None
+                top_neighbor_y = None
+
+                # Проверяем все другие проемы
+                for other_opening in openings:
+                    if other_opening.get("id") == opening_id:
+                        continue
+
+                    other_bbox = other_opening.get("bbox", {})
+                    other_orientation = other_opening.get("orientation", "horizontal")
+
+                    if other_bbox and other_orientation == "vertical":
+                        other_x = other_bbox["x"] * scale_factor
+
+                        # Проверяем, что на той же линии (похожие X координаты)
+                        if abs(other_x - current_x) < 0.05:  # 5см толеранс
+                            other_y = other_bbox["y"] * scale_factor
+                            other_height = other_bbox["height"] * scale_factor
+                            other_y_end = other_y + other_height
+
+                            # Проверяем, находится ли снизу
+                            if other_y_end <= current_y:
+                                gap = current_y - other_y_end
+                                if gap < GAP_THRESHOLD:
+                                    if bottom_neighbor_y is None or other_y_end > bottom_neighbor_y:
+                                        bottom_neighbor_y = other_y_end
+
+                            # Проверяем, находится ли сверху
+                            elif other_y >= current_y_end:
+                                gap = other_y - current_y_end
+                                if gap < GAP_THRESHOLD:
+                                    if top_neighbor_y is None or other_y < top_neighbor_y:
+                                        top_neighbor_y = other_y
+
+                # Формируем neighbor_bounds
+                if bottom_neighbor_y is not None or top_neighbor_y is not None:
+                    neighbor_bounds = {
+                        'bottom': bottom_neighbor_y,
+                        'top': top_neighbor_y
+                    }
+
+            opening_obj = create_opening_mesh(opening, wall_height_meters, wall_thickness, scale_factor, is_external=is_ext, wall_obj=related_wall, wall_bounds=wall_bounds, neighbor_bounds=neighbor_bounds)
             if opening_obj:
                 opening_objects.append(opening_obj)
                 if is_ext:
@@ -3237,7 +3734,7 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
 if __name__ == "__main__":
     # Путь к файлу с координатами стен
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(script_dir, "wall_coordinates.json")
+    json_path = os.path.join(script_dir, "wall_coordinates_inverted.json")
     
     # Путь к текстуре кирпича (опционально)
     brick_texture_path = os.path.join(script_dir, "brick_texture.jpg")
