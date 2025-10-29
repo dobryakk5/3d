@@ -3986,16 +3986,38 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
 
 # Использование
 if __name__ == "__main__":
-    # Путь к файлу с координатами стен
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(script_dir, "wall_coordinates_inverted.json")
+    import sys
     
-    # Путь к текстуре кирпича (опционально)
-    brick_texture_path = os.path.join(script_dir, "brick_texture.jpg")
+    # Проверяем, передан ли параметр --no-auto-run
+    auto_run = "--no-auto-run" not in sys.argv
     
-    # Создаем 3D стены с указанной высотой и текстурой кирпича для внешних стен
-    # Также создаем изометрический рендер и отображаем номера junctions
-    create_3d_walls_from_json(json_path, wall_height=3.0, export_obj=True,
-                             brick_texture_path=brick_texture_path, render_isometric=True,
-                             show_junction_labels=True)
+    if auto_run:
+        print("=" * 60)
+        print("АВТОМАТИЧЕСКИЙ ЗАПУСК СОЗДАНИЯ 3D СТЕН")
+        print("=" * 60)
+        
+        # Путь к файлу с координатами стен
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.join(script_dir, "wall_coordinates_inverted.json")
+        
+        # Путь к текстуре кирпича (опционально)
+        brick_texture_path = os.path.join(script_dir, "brick_texture.jpg")
+        
+        # Создаем 3D стены с указанной высотой и текстурой кирпича для внешних стен
+        # Также создаем изометрический рендер и отображаем номера junctions
+        success = create_3d_walls_from_json(json_path, wall_height=3.0, export_obj=True,
+                                         brick_texture_path=brick_texture_path, render_isometric=True,
+                                         show_junction_labels=True)
+        
+        if success:
+            print("=" * 60)
+            print("АВТОМАТИЧЕСКИЙ ЗАПУСК УСПЕШНО ЗАВЕРШЕН")
+            print("=" * 60)
+        else:
+            print("=" * 60)
+            print("АВТОМАТИЧЕСКИЙ ЗАПУСК ЗАВЕРШИЛСЯ С ОШИБКОЙ")
+            print("=" * 60)
+            sys.exit(1)
+    else:
+        print("Скрипт загружен без автоматического запуска (--no-auto-run)")
     

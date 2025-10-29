@@ -2,7 +2,7 @@
   "metadata": {
     "source_file": "plan_floor1_objects.json",
     "wall_thickness": 22.0,
-    "timestamp": "2025-10-29T15:26:56.428950",
+    "timestamp": "2025-10-29T20:50:03.195513",
     "version": "1.0"
   },
   "junctions": [
@@ -2085,7 +2085,7 @@
         "junction_name": "J14",
         "junction_id": 14,
         "junction_type": "wall_intersection",
-        "corner": 0
+        "corner": 1
       }
     ],
     "area": 748234.0,

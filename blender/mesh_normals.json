@@ -1,0 +1,268 @@
+{
+  "0": {
+    "direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "axis": "X",
+    "sign": "+",
+    "position": 8.864999771118164,
+    "center": [
+      8.864999771118164,
+      4.692000055313111,
+      1.5
+    ],
+    "face_count": 7,
+    "run_idx": 0,
+    "start_junction_id": 6,
+    "end_junction_id": 4
+  },
+  "1": {
+    "direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "axis": "X",
+    "sign": "-",
+    "position": 8.645000457763672,
+    "center": [
+      8.645000457763672,
+      5.117500066757202,
+      1.5
+    ],
+    "face_count": 6,
+    "run_idx": 0,
+    "start_junction_id": 6,
+    "end_junction_id": 4
+  },
+  "2": {
+    "direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "+",
+    "position": 9.885000228881836,
+    "center": [
+      6.137749958038331,
+      9.885000228881836,
+      1.5
+    ],
+    "face_count": 7,
+    "run_idx": 1,
+    "start_junction_id": 4,
+    "end_junction_id": 10
+  },
+  "3": {
+    "direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "-",
+    "position": 9.664999961853027,
+    "center": [
+      5.560750055313111,
+      9.664999961853027,
+      1.5
+    ],
+    "face_count": 7,
+    "run_idx": 1,
+    "start_junction_id": 4,
+    "end_junction_id": 10
+  },
+  "4": {
+    "direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "axis": "X",
+    "sign": "+",
+    "position": 3.1575000286102295,
+    "center": [
+      3.1575000286102295,
+      10.632500171661377,
+      1.5
+    ],
+    "face_count": 2,
+    "run_idx": 2,
+    "start_junction_id": 10,
+    "end_junction_id": 5
+  },
+  "5": {
+    "direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "axis": "X",
+    "sign": "-",
+    "position": 2.944999933242798,
+    "center": [
+      2.944999933242798,
+      10.059999942779541,
+      1.5
+    ],
+    "face_count": 2,
+    "run_idx": 2,
+    "start_junction_id": 10,
+    "end_junction_id": 5
+  },
+  "6": {
+    "direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "+",
+    "position": 11.029999732971191,
+    "center": [
+      1.5893749609589576,
+      11.029999732971191,
+      1.5
+    ],
+    "face_count": 5,
+    "run_idx": 3,
+    "start_junction_id": 5,
+    "end_junction_id": 3
+  },
+  "7": {
+    "direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "-",
+    "position": 10.8100004196167,
+    "center": [
+      1.5947500348091124,
+      10.8100004196167,
+      1.5
+    ],
+    "face_count": 3,
+    "run_idx": 3,
+    "start_junction_id": 5,
+    "end_junction_id": 3
+  },
+  "8": {
+    "direction": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "axis": "X",
+    "sign": "+",
+    "position": 0.2199999988079071,
+    "center": [
+      0.2199999988079071,
+      6.152999973297119,
+      1.5
+    ],
+    "face_count": 5,
+    "run_idx": 4,
+    "start_junction_id": 3,
+    "end_junction_id": 7
+  },
+  "9": {
+    "direction": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "axis": "X",
+    "sign": "-",
+    "position": 0.0,
+    "center": [
+      0.0,
+      6.194999980926514,
+      1.5
+    ],
+    "face_count": 7,
+    "run_idx": 4,
+    "start_junction_id": 3,
+    "end_junction_id": 7
+  },
+  "10": {
+    "direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "+",
+    "position": 1.6112499833106995,
+    "center": [
+      4.3912500739097595,
+      1.6112499833106995,
+      1.5
+    ],
+    "face_count": 6,
+    "run_idx": 5,
+    "start_junction_id": 7,
+    "end_junction_id": 14
+  },
+  "11": {
+    "direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "-",
+    "position": 1.3924999237060547,
+    "center": [
+      3.577999970316887,
+      1.3924999237060547,
+      1.5
+    ],
+    "face_count": 7,
+    "run_idx": 5,
+    "start_junction_id": 7,
+    "end_junction_id": 14
+  },
+  "12": {
+    "direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "+",
+    "position": 1.6100000143051147,
+    "center": [
+      8.450833320617676,
+      1.6100000143051147,
+      1.5
+    ],
+    "face_count": 1,
+    "run_idx": 6,
+    "start_junction_id": 14,
+    "end_junction_id": 6
+  },
+  "13": {
+    "direction": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "axis": "Y",
+    "sign": "-",
+    "position": 1.449999988079071,
+    "center": [
+      8.602916717529297,
+      1.449999988079071,
+      1.5
+    ],
+    "face_count": 2,
+    "run_idx": 6,
+    "start_junction_id": 14,
+    "end_junction_id": 6
+  }
+}

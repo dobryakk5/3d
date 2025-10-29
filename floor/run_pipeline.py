@@ -13,11 +13,23 @@ import sys
 import time
 import traceback
 import subprocess
+import argparse
 from pathlib import Path
 
 # Добавляем текущую директорию в путь для импортов
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
+
+def parse_arguments():
+    """Парсит аргументы командной строки"""
+    parser = argparse.ArgumentParser(description='Unified Pipeline для обработки архитектурных планов')
+    parser.add_argument('input_file', help='Путь к входному JPG файлу')
+    return parser.parse_args()
+
+def get_base_filename(input_file):
+    """Получает базовое имя файла без расширения"""
+    base_name = Path(input_file).stem
+    return base_name
 
 def print_separator(title="", width=80):
     """Выводит разделитель с заголовком"""
@@ -37,12 +49,21 @@ def check_file_exists(file_path, description=""):
             print(f"    Описание: {description}")
         return False
 
-def check_required_files():
+def check_required_files(input_file):
     """Проверяет наличие всех необходимых файлов"""
     print_separator("ПРОВЕРКА НЕОБХОДИМЫХ ФАЙЛОВ")
     
+    # Проверяем входной файл по полному пути
+    if not os.path.exists(input_file):
+        print(f"  ✗ Файл не найден: {input_file}")
+        print(f"    Описание: Входное изображение плана")
+        return False
+    else:
+        print(f"  ✓ Файл найден: {input_file}")
+        print(f"    Описание: Входное изображение плана")
+    
+    # Проверяем скрипты в текущей директории
     required_files = [
-        ("plan_floor1.jpg", "Входное изображение плана"),
         ("hatching_mask.py", "Скрипт обнаружения штриховки"),
         ("export_objects.py", "Скрипт экспорта объектов в JSON"),
         ("visualize_polygons_align.py", "Скрипт выравнивания проемов"),
@@ -59,7 +80,7 @@ def check_required_files():
     
     all_files_exist = True
     
-    print("Основные файлы:")
+    print("\nОсновные файлы:")
     for file_path, description in required_files:
         if not check_file_exists(file_path, description):
             all_files_exist = False
@@ -73,7 +94,7 @@ def check_required_files():
     
     return all_files_exist
 
-def run_script(script_name, description=""):
+def run_script(script_name, description="", input_file=None):
     """Запускает Python скрипт и обрабатывает ошибки"""
     print_separator(f"ЗАПУСК: {description if description else script_name}")
     
@@ -82,9 +103,14 @@ def run_script(script_name, description=""):
         print(f"Запуск скрипта: {script_name}")
         print(f"Время начала: {time.strftime('%H:%M:%S')}")
         
+        # Подготавливаем команду
+        cmd = [sys.executable, script_name]
+        if input_file:
+            cmd.append(input_file)
+        
         # Запускаем скрипт как subprocess для лучшей изоляции
         result = subprocess.run(
-            [sys.executable, script_name],
+            cmd,
             cwd=current_dir,
             capture_output=True,
             text=True,
@@ -121,13 +147,13 @@ def run_script(script_name, description=""):
         traceback.print_exc()
         return False
 
-def check_output_files():
+def check_output_files(base_name):
     """Проверяет наличие выходных файлов"""
     print_separator("ПРОВЕРКА ВЫХОДНЫХ ФАЙЛОВ")
     
     output_files = [
         ("enhanced_hatching_strict_mask.png", "Маска штриховки"),
-        ("plan_floor1_objects.json", "JSON файл с объектами"),
+        (f"{base_name}_objects.json", "JSON файл с объектами"),
         ("wall_coordinates.json", "JSON файл с координатами стен"),
         ("wall_polygons.svg", "SVG файл визуализации"),
     ]
@@ -136,13 +162,13 @@ def check_output_files():
     for file_path, description in output_files:
         check_file_exists(file_path, description)
 
-def run_hatching_detection():
+def run_hatching_detection(input_file):
     """Этап 1: Обнаружение штриховки"""
-    return run_script("hatching_mask.py", "Hatching Detection")
+    return run_script("hatching_mask.py", "Hatching Detection", input_file)
 
-def run_export_objects():
+def run_export_objects(input_file):
     """Этап 2: Экспорт объектов в JSON"""
-    return run_script("export_objects.py", "Export Objects to JSON")
+    return run_script("export_objects.py", "Export Objects to JSON", input_file)
 
 def run_align_openings():
     """Этап 3: Выравнивание проемов"""
@@ -154,26 +180,33 @@ def run_visualization():
 
 def main():
     """Основная функция pipeline"""
+    # Парсим аргументы командной строки
+    args = parse_arguments()
+    input_file = args.input_file
+    base_name = get_base_filename(input_file)
+    
     print_separator("UNIFIED PIPELINE ДЛЯ ОБРАБОТКИ АРХИТЕКТУРНЫХ ПЛАНОВ")
     
     total_start_time = time.time()
     print(f"Время начала: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Входной файл: {input_file}")
+    print(f"Базовое имя: {base_name}")
     
     # Этап 0: Проверка необходимых файлов
-    if not check_required_files():
+    if not check_required_files(input_file):
         print("\n✗ Ошибка: отсутствуют необходимые файлы")
         print("Пожалуйста, убедитесь, что все необходимые файлы присутствуют в директории")
         return False
     
     # Этап 1: Обнаружение штриховки
     print_separator("ЭТАП 1/4: ОБНАРУЖЕНИЕ ШТРИХОВКИ")
-    if not run_hatching_detection():
+    if not run_hatching_detection(input_file):
         print("\n✗ Ошибка на этапе обнаружения штриховки")
         return False
     
     # Этап 2: Экспорт объектов в JSON
     print_separator("ЭТАП 2/4: ЭКСПОРТ ОБЪЕКТОВ В JSON")
-    if not run_export_objects():
+    if not run_export_objects(input_file):
         print("\n✗ Ошибка на этапе экспорта объектов")
         return False
     
@@ -198,12 +231,12 @@ def main():
     print(f"Время завершения: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Проверка выходных файлов
-    check_output_files()
+    check_output_files(base_name)
     
     print("\n✓ Все этапы pipeline выполнены успешно!")
     print("\nСозданные файлы:")
-    print("  - enhanced_hatching_strict_mask.png (маска штриховки)")
-    print("  - plan_floor1_objects.json (объекты плана, выровненные)")
+    print(f"  - enhanced_hatching_strict_mask.png (маска штриховки)")
+    print(f"  - {base_name}_objects.json (объекты плана, выровненные)")
     print("  - wall_coordinates.json (координаты стен)")
     print("  - wall_polygons.svg (визуализация)")
     

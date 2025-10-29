@@ -19,6 +19,7 @@ WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
 CUT_MARGIN = 0.05          # запас для гарантии пересечения
 OPENING_WIDTH_MULTIPLIER = 1.95  # масштаб ширины проёмов
+WINDOW_FRAME_WIDTH = 0.05  # ширина рамки окна по периметру (м)
 
 WINDOW_BOTTOM = 0.65
 WINDOW_TOP = 2.45
@@ -37,6 +38,7 @@ FOUNDATION_THICKNESS = 0.75 # толщина фундамента в метра�
 EXPORT_LABELS_IN_OBJ = True   # при True метки-конвертируются в mesh и попадают в OBJ
 LABEL_Z_OFFSET = 0.05         # поднять метки на 5 см над стеной
 DEBUG_WALL_TO_VISUALIZE = None   # номер стены для визуализации её граней (None, чтобы выключить)
+SLAB_THICKNESS = 0.20         # толщина перекрытия (20 см)
 
 # ---------------------------------
 # Вспомогательные функции
@@ -473,6 +475,253 @@ def create_foundation(foundation_data, z_offset=FOUNDATION_Z_OFFSET, thickness=F
     return foundation_obj
 
 
+def create_slab_from_outline(outline_vertices,
+                             z_base=WALL_HEIGHT,
+                             thickness=SLAB_THICKNESS,
+                             scale_factor=SCALE_FACTOR,
+                             collection_name="Перекрытие",
+                             object_name="Перекрытие"):
+    """Создаёт перекрытие (плита) по полигону внешнего контура здания.
+
+    - XY: берём из data["building_outline"]["vertices"]
+    - Z: нижняя грань на уровне z_base, толщина вверх = thickness
+    - Объект складывается в коллекцию с именем collection_name
+    """
+    if not outline_vertices or len(outline_vertices) < 3:
+        print("    ⚠️  Недостаточно вершин контура для создания перекрытия")
+        return None
+
+    # Получим список уникальных 2D-точек (на случай, если последняя = первая)
+    pts = [(float(v['x']) * scale_factor, float(v['y']) * scale_factor) for v in outline_vertices]
+    if len(pts) >= 2:
+        x0, y0 = pts[0]
+        xN, yN = pts[-1]
+        if abs(x0 - xN) < 1e-9 and abs(y0 - yN) < 1e-9:
+            pts = pts[:-1]
+    if len(pts) < 3:
+        print("    ⚠️  Некорректный полигон контура для перекрытия")
+        return None
+
+    n = len(pts)
+    z0 = float(z_base)
+    z1 = float(z_base) + float(thickness)
+
+    vertices = []
+    # нижний контур (z0)
+    for x, y in pts:
+        vertices.append((x, y, z0))
+    # верхний контур (z1)
+    for x, y in pts:
+        vertices.append((x, y, z1))
+
+    faces = []
+    # Верхняя грань
+    top_face = list(range(n, 2 * n))
+    faces.append(top_face)
+    # Нижняя грань (реверс, чтобы нормаль смотрела вниз)
+    bottom_face = list(range(0, n))
+    bottom_face.reverse()
+    faces.append(bottom_face)
+    # Боковые грани
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append([i, j, n + j, n + i])
+
+    mesh = bpy.data.meshes.new(name="SlabMesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+
+    slab_obj = bpy.data.objects.new(object_name, mesh)
+    # поместим объект в отдельную коллекцию
+    coll = get_or_create_collection(collection_name)
+    coll.objects.link(slab_obj)
+
+    # Нормали и материал
+    bpy.context.view_layer.objects.active = slab_obj
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    mat = get_or_create_material("Slab_Concrete_LightGray", (0.75, 0.75, 0.75, 1.0))
+    slab_obj.data.materials.append(mat)
+
+    print(f"    ✅ Перекрытие создано: вершин={len(vertices)}, граней={len(faces)}, Z=[{z0:.2f}..{z1:.2f}] м")
+    return slab_obj
+
+
+def create_slab_from_external_outer_edges(wall_obj,
+                                          z_base=WALL_HEIGHT,
+                                          thickness=SLAB_THICKNESS,
+                                          collection_name="Перекрытие",
+                                          object_name="Перекрытие"):
+    """Строит перекрытие по внешней кромке стен (граням с тегом 'external').
+
+    Ищет рёбра на уровне верхней кромки стен (Z ≈ z_base), принадлежащие внешним вертикальным
+    граням, формирует из них замкнутую ломаную (внешний контур) и создает плиту толщиной
+    thickness, начиная с z_base вверх.
+    """
+    if wall_obj is None or wall_obj.type != 'MESH':
+        print("    ⚠️  Неверный объект стены для построения перекрытия")
+        return None
+
+    # Считываем геометрию через bmesh без перехода в EDIT
+    bm = bmesh.new()
+    bm.from_mesh(wall_obj.data)
+    ext_layer = bm.faces.layers.int.get("external")
+    if ext_layer is None:
+        bm.free()
+        print("    ⚠️  На стенах нет слоя 'external' — fallback к контуру")
+        return None
+
+    z_tol = 1e-4
+    # Собираем верхние рёбра внешних вертикальных граней
+    segs = []  # список ((x1,y1), (x2,y2))
+    for f in bm.faces:
+        try:
+            is_ext = int(f[ext_layer]) == 1
+        except Exception:
+            is_ext = False
+        # вертикальная грань: нормаль почти в XY, а не по Z
+        if not is_ext or abs(float(f.normal.z)) > 0.5:
+            continue
+        for e in f.edges:
+            v1, v2 = e.verts[0], e.verts[1]
+            z1, z2 = float(v1.co.z), float(v2.co.z)
+            if abs(z1 - z_base) < z_tol and abs(z2 - z_base) < z_tol:
+                p1 = (float(v1.co.x), float(v1.co.y))
+                p2 = (float(v2.co.x), float(v2.co.y))
+                if p1 != p2:
+                    segs.append((p1, p2))
+
+    if not segs:
+        bm.free()
+        print("    ⚠️  Не удалось найти верхние внешние рёбра — fallback к контуру")
+        return None
+
+    # Строим петли из сегментов по совпадению вершин (с округлением для надёжности)
+    def key_xy(p):
+        return (round(p[0], 5), round(p[1], 5))
+
+    adj = {}
+    for a, b in segs:
+        ka, kb = key_xy(a), key_xy(b)
+        adj.setdefault(ka, []).append(kb)
+        adj.setdefault(kb, []).append(ka)
+
+    used_edges = set()
+    loops = []
+
+    # Проход по рёбрам, формируя замкнутые лупы
+    for start in list(adj.keys()):
+        # найдём первое ребро, которое ещё не использовано
+        nexts = adj.get(start, [])
+        started = False
+        for nb in nexts:
+            edge_key = tuple(sorted((start, nb)))
+            if edge_key not in used_edges:
+                curr = start
+                prev = None
+                loop = [start]
+                curr_nb = nb
+                started = True
+                break
+        if not started:
+            continue
+        # Обходим цикл
+        while True:
+            used_edges.add(tuple(sorted((curr, curr_nb))))
+            curr = curr_nb
+            loop.append(curr)
+            # Выбираем следующего соседа, не равного предыдущему и не использованное ребро
+            candidates = adj.get(curr, [])
+            nxt = None
+            for c in candidates:
+                if c == loop[-2]:
+                    continue
+                ek = tuple(sorted((curr, c)))
+                if ek in used_edges:
+                    continue
+                nxt = c
+                break
+            if nxt is None:
+                # Замкнулись?
+                if curr == start:
+                    loops.append(loop[:-1])  # без повторения последней = первой
+                break
+            curr_nb = nxt
+
+    if not loops:
+        bm.free()
+        print("    ⚠️  Не удалось собрать внешний контур — fallback к контуру")
+        return None
+
+    # Выберем контур с максимальной площади по модулю (внешний контур)
+    def area(poly):
+        s = 0.0
+        for i in range(len(poly)):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % len(poly)]
+            s += x1 * y2 - x2 * y1
+        return 0.5 * s
+
+    # Преобразуем ключи обратно в координаты
+    def unkey(k):
+        return (float(k[0]), float(k[1]))
+
+    polys = [[unkey(k) for k in lp] for lp in loops if len(lp) >= 3]
+    if not polys:
+        bm.free()
+        print("    ⚠️  В контурах недостаточно вершин — fallback к контуру")
+        return None
+
+    polys.sort(key=lambda P: abs(area(P)), reverse=True)
+    outer = polys[0]
+
+    # Создаем меш плиты по найденному контуру
+    n = len(outer)
+    z0 = float(z_base)
+    z1 = float(z_base) + float(thickness)
+
+    verts = []
+    for x, y in outer:
+        verts.append((x, y, z0))
+    for x, y in outer:
+        verts.append((x, y, z1))
+
+    faces = []
+    top_face = list(range(n, 2 * n))
+    faces.append(top_face)
+    bottom_face = list(range(0, n))
+    bottom_face.reverse()
+    faces.append(bottom_face)
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append([i, j, n + j, n + i])
+
+    mesh = bpy.data.meshes.new(name="SlabMesh_Outer")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+
+    slab_obj = bpy.data.objects.new(object_name, mesh)
+    coll = get_or_create_collection(collection_name)
+    coll.objects.link(slab_obj)
+
+    # Нормали и материал
+    bpy.context.view_layer.objects.active = slab_obj
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    mat = get_or_create_material("Slab_Concrete_LightGray", (0.75, 0.75, 0.75, 1.0))
+    slab_obj.data.materials.append(mat)
+
+    bm.free()
+    print(f"    ✅ Перекрытие (по external) создано: вершин={len(verts)}, граней={len(faces)}, Z=[{z0:.2f}..{z1:.2f}] м")
+    return slab_obj
+
+
 def merge_duplicate_vertices(obj, distance):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode='EDIT')
@@ -567,7 +816,8 @@ def create_opening_cutters(openings, opening_heights):
 
 def create_opening_fills(openings, opening_heights,
                          wall_thickness_px=WALL_THICKNESS_PX,
-                         scale_factor=SCALE_FACTOR):
+                         scale_factor=SCALE_FACTOR,
+                         doors_near_windows=None):
     """Создаёт заполняющие объекты в проёмах: окна — голубые, двери — тёмно-коричневые.
 
     Геометрия совпадает с размерами вырезателей (cutters).
@@ -612,13 +862,15 @@ def create_opening_fills(openings, opening_heights,
             z_center = (float(bottom) + float(top)) * 0.5
 
         if orientation == "vertical":
-            width = thickness_m * 3.0
+            # Делаем толщину в 2 раза меньше (было 3.0)
+            width = thickness_m * 1.5
             depth = float(bbox["height"]) * scale_factor * OPENING_WIDTH_MULTIPLIER
         else:
             width = float(bbox["width"]) * scale_factor * OPENING_WIDTH_MULTIPLIER
-            depth = thickness_m * 3.0
+            # Делаем толщину в 2 раза меньше (было 3.0)
+            depth = thickness_m * 1.5
 
-        # Создаём заполнитель
+        # Создаём заполнитель (без рамки)
         bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x_center, y_center, z_center))
         fill_obj = bpy.context.active_object
         fill_obj.name = ("Window_Fill_" if otype == "window" else "Door_Fill_") + str(opening.get('id', 'unknown'))
@@ -629,7 +881,9 @@ def create_opening_fills(openings, opening_heights,
         if otype == "window":
             fill_obj.data.materials.append(mat_window)
         else:
-            fill_obj.data.materials.append(mat_door)
+            # Если дверь близко к окну (< 0.5 толщины стены) — красим как окно
+            near = bool(doors_near_windows) and (opening.get('id') in doors_near_windows)
+            fill_obj.data.materials.append(mat_window if near else mat_door)
 
         # Перенос в коллекцию: сначала убрать из всех текущих
         for c in list(fill_obj.users_collection):
@@ -637,6 +891,8 @@ def create_opening_fills(openings, opening_heights,
         fills_collection.objects.link(fill_obj)
 
         created.append(fill_obj)
+
+        # Рамки по периметру окон отключены по запросу
 
     print(f"    Заполнители проёмов созданы: {len(created)}")
     return created
@@ -1086,6 +1342,66 @@ def save_wall_normals_to_json(wall_info, path=OUTPUT_NORMALS_JSON):
         print(f"    ❌ Ошибка записи нормалей в JSON: {e}")
 
 
+def compute_doors_near_windows(openings,
+                               scale_factor=SCALE_FACTOR,
+                               wall_thickness_px=WALL_THICKNESS_PX):
+    """Возвращает множество id дверей, которые ближе половины толщины стены к окну.
+
+    Критерий:
+      - одинаковая ориентация (vertical/horizontal)
+      - близость по плоскости стены (|plane_d - plane_w| <= толщина стены)
+      - зазор вдоль оси протяженности <= 0.5 * толщина стены
+    """
+    thickness_m = float(wall_thickness_px) * float(scale_factor)
+    half_thick = 0.5 * thickness_m
+    plane_tol = thickness_m
+
+    def to_entry(op):
+        bbox = op.get('bbox') or {}
+        ori = op.get('orientation', 'horizontal')
+        x, y = float(bbox.get('x', 0.0)) * scale_factor, float(bbox.get('y', 0.0)) * scale_factor
+        w, h = float(bbox.get('width', 0.0)) * scale_factor, float(bbox.get('height', 0.0)) * scale_factor
+        if ori == 'vertical':
+            plane = x + 0.5 * w
+            smin, smax = y, y + h
+        else:
+            plane = y + 0.5 * h
+            smin, smax = x, x + w
+        return {
+            'id': op.get('id'),
+            'type': (op.get('type') or '').lower(),
+            'orientation': ori,
+            'plane': plane,
+            'smin': min(smin, smax),
+            'smax': max(smin, smax),
+        }
+
+    entries = [to_entry(o) for o in openings if o.get('bbox')]
+    doors = [e for e in entries if e['type'] == 'door']
+    windows = [e for e in entries if e['type'] == 'window']
+
+    def interval_gap(a_min, a_max, b_min, b_max):
+        if a_max < b_min:
+            return b_min - a_max
+        if b_max < a_min:
+            return a_min - b_max
+        return 0.0
+
+    near = set()
+    for d in doors:
+        for w in windows:
+            if d['orientation'] != w['orientation']:
+                continue
+            if abs(d['plane'] - w['plane']) > plane_tol:
+                continue
+            gap = interval_gap(d['smin'], d['smax'], w['smin'], w['smax'])
+            if gap <= half_thick + 1e-6:
+                near.add(d['id'])
+                break
+    print(f"    Близкие к окнам двери (<= 0.5 толщины): {len(near)}")
+    return near
+
+
 def create_highlight_material(name="WallFacesHighlight", color=(0.1, 0.9, 0.2, 1.0)):
     if name in bpy.data.materials:
         mat = bpy.data.materials[name]
@@ -1192,6 +1508,8 @@ def assign_wall_materials(obj, outline_vertices,
 
     # Присваиваем материал полигонам
     eps = max(WALL_THICKNESS_PX * SCALE_FACTOR * 0.45, 0.05)  # ≈ половина толщины, но не < 5см
+    # Запомним, какие грани внешние, чтобы проставить тег 'external'
+    poly_is_external = [False] * len(obj.data.polygons)
     for poly in obj.data.polygons:
         n = poly.normal
         # Пропустим верх/низ (нормаль почти по Z)
@@ -1212,8 +1530,29 @@ def assign_wall_materials(obj, outline_vertices,
         px_out = (cx + nx * eps, cy + ny * eps)
         is_outside = not point_in_polygon(px_out, outline_poly)
         poly.material_index = outer_idx if is_outside else inner_idx
+        poly_is_external[poly.index] = bool(is_outside)
 
-    print("    ✅ Материалы назначены: внешние — жёлтый, внутренние — белый")
+    # Проставляем тег 'external' на уровне граней (face layer)
+    try:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode='EDIT')
+        bm = bmesh.from_edit_mesh(obj.data)
+        ext_layer = bm.faces.layers.int.get("external")
+        if ext_layer is None:
+            ext_layer = bm.faces.layers.int.new("external")
+        for f in bm.faces:
+            flag = 1 if (f.index < len(poly_is_external) and poly_is_external[f.index]) else 0
+            f[ext_layer] = flag
+        bmesh.update_edit_mesh(obj.data)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        tagged = sum(1 for v in poly_is_external if v)
+        print(f"    ✅ Материалы назначены и тег 'external' проставлен: {tagged} граней внешние")
+    except Exception as e:
+        try:
+            bpy.ops.object.mode_set(mode='OBJECT')
+        except Exception:
+            pass
+        print(f"    ⚠️  Не удалось проставить тег 'external' на гранях: {e}")
 
 
 def visualize_wall_faces(src_obj, wall_number, collection_name="WALLS_DEBUG"):
@@ -1472,7 +1811,9 @@ def main():
 
     # Заполняем проёмы новыми объектами (окна — голубые, двери — тёмно-коричневые)
     try:
-        create_opening_fills(openings, opening_heights)
+        # Определим двери, близкие к окнам (<= 0.5 толщины стены)
+        doors_near = compute_doors_near_windows(openings)
+        create_opening_fills(openings, opening_heights, doors_near_windows=doors_near)
     except Exception as e:
         print(f"    ⚠️ Не удалось создать заполнители проёмов: {e}")
 
@@ -1486,6 +1827,27 @@ def main():
         assign_wall_materials(wall_obj, vertices)
     except Exception as e:
         print(f"    ⚠️  Не удалось назначить материалы стенам: {e}")
+
+    # Перекрытие (плита над 1-м этажом): толщина 20 см, снизу на уровне верхней кромки стен
+    slab_obj = None
+    try:
+        print("\n[SLAB] Создание перекрытия по внешним граням (external)")
+        slab_obj = create_slab_from_external_outer_edges(wall_obj,
+                                                         z_base=WALL_HEIGHT,
+                                                         thickness=SLAB_THICKNESS,
+                                                         collection_name="Перекрытие",
+                                                         object_name="Перекрытие")
+        if slab_obj is None:
+            # Fallback: по исходному контуру (без смещения)
+            print("    ↪️  Переход к созданию плиты по линейному контуру")
+            slab_obj = create_slab_from_outline(vertices,
+                                                z_base=WALL_HEIGHT,
+                                                thickness=SLAB_THICKNESS,
+                                                scale_factor=SCALE_FACTOR,
+                                                collection_name="Перекрытие",
+                                                object_name="Перекрытие")
+    except Exception as e:
+        print(f"    ⚠️  Не удалось создать перекрытие: {e}")
 
     # Импорт 3D-объектов из OBJ и сбор в отдельную коллекцию:
     # берём только те объекты, чья XY-середина НЕ лежит на основании Outline_Walls
@@ -1518,6 +1880,8 @@ def main():
             print(f"    ⚠️  Ошибка при подготовке меток к экспорту: {e}")
     if foundation_obj is not None:
         objects_to_export.append(foundation_obj)
+    if 'slab_obj' in locals() and slab_obj is not None:
+        objects_to_export.append(slab_obj)
     export_obj(objects_to_export, OUTPUT_OBJ)
 
     print()
@@ -1531,6 +1895,10 @@ def main():
         print(f"Фундамент: {foundation_obj.name} ✅")
     else:
         print(f"Фундамент: отсутствует")
+    if 'slab_obj' in locals() and slab_obj is not None:
+        print(f"Перекрытие: {slab_obj.name} ✅")
+    else:
+        print("Перекрытие: отсутствует")
     
     # Проверяем результат
     if len(wall_obj.data.vertices) > 50:  # Должно быть достаточно вершин после вырезания
@@ -1540,4 +1908,28 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    # Проверяем, передан ли параметр --no-auto-run
+    auto_run = "--no-auto-run" not in sys.argv
+    
+    if auto_run:
+        print("=" * 70)
+        print("АВТОМАТИЧЕСКИЙ ЗАПУСК СОЗДАНИЯ КОНТУРА С ПРОЁМАМИ")
+        print("=" * 70)
+        
+        success = True
+        try:
+            main()
+            print("=" * 70)
+            print("АВТОМАТИЧЕСКИЙ ЗАПУСК УСПЕШНО ЗАВЕРШЕН")
+            print("=" * 70)
+        except Exception as e:
+            print(f"Ошибка при выполнении: {e}")
+            success = False
+            print("=" * 70)
+            print("АВТОМАТИЧЕСКИЙ ЗАПУСК ЗАВЕРШИЛСЯ С ОШИБКОЙ")
+            print("=" * 70)
+            sys.exit(1)
+    else:
+        print("Скрипт загружен без автоматического запуска (--no-auto-run)")
