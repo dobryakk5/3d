@@ -565,6 +565,82 @@ def create_opening_cutters(openings, opening_heights):
     print(f"    Создано вырезателей: {len(entries)}")
     return entries
 
+def create_opening_fills(openings, opening_heights,
+                         wall_thickness_px=WALL_THICKNESS_PX,
+                         scale_factor=SCALE_FACTOR):
+    """Создаёт заполняющие объекты в проёмах: окна — голубые, двери — тёмно-коричневые.
+
+    Геометрия совпадает с размерами вырезателей (cutters).
+    Объекты складываются в коллекцию "OPENING_FILLS".
+    """
+    fills_collection = get_or_create_collection("OPENING_FILLS")
+
+    # Материалы
+    mat_window = get_or_create_material("Window_Fill_Blue", (0.45, 0.75, 1.0, 1.0))
+    mat_door = get_or_create_material("Door_Fill_Dark_Brown", (0.20, 0.12, 0.05, 1.0))
+
+    thickness_m = float(wall_thickness_px) * float(scale_factor)
+    created = []
+
+    for opening in openings:
+        bbox = opening.get("bbox")
+        if not bbox:
+            continue
+
+        otype = (opening.get("type") or "").lower()
+        orientation = opening.get("orientation", "horizontal")
+
+        # Центр в XY
+        x_center = (bbox["x"] + bbox["width"] / 2.0) * scale_factor
+        y_center = (bbox["y"] + bbox["height"] / 2.0) * scale_factor
+
+        # Высоты Z (или совместимый аппрокс.)
+        bottom_top = opening_heights.get(opening["id"]) if opening_heights else None
+        if bottom_top:
+            bottom, top = bottom_top
+        else:
+            bottom, top = opening_bounds(opening)
+
+        # XY размеры и высота — точно как у вырезателей
+        if bottom_top:
+            # логика cutters: высота = (top-bottom) * 2.0
+            height = (float(top) - float(bottom)) * 2.0
+            z_center = (float(bottom) + float(top)) * 0.5
+        else:
+            # логика cutters: высота = (top-bottom) * 1.2
+            height = (float(top) - float(bottom)) * 1.2
+            z_center = (float(bottom) + float(top)) * 0.5
+
+        if orientation == "vertical":
+            width = thickness_m * 3.0
+            depth = float(bbox["height"]) * scale_factor * OPENING_WIDTH_MULTIPLIER
+        else:
+            width = float(bbox["width"]) * scale_factor * OPENING_WIDTH_MULTIPLIER
+            depth = thickness_m * 3.0
+
+        # Создаём заполнитель
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x_center, y_center, z_center))
+        fill_obj = bpy.context.active_object
+        fill_obj.name = ("Window_Fill_" if otype == "window" else "Door_Fill_") + str(opening.get('id', 'unknown'))
+        fill_obj.scale = (width / 2.0, depth / 2.0, height / 2.0)
+
+        # Материал по типу
+        fill_obj.data.materials.clear()
+        if otype == "window":
+            fill_obj.data.materials.append(mat_window)
+        else:
+            fill_obj.data.materials.append(mat_door)
+
+        # Перенос в коллекцию: сначала убрать из всех текущих
+        for c in list(fill_obj.users_collection):
+            c.objects.unlink(fill_obj)
+        fills_collection.objects.link(fill_obj)
+
+        created.append(fill_obj)
+
+    print(f"    Заполнители проёмов созданы: {len(created)}")
+    return created
+
 
 def apply_boolean_operations(wall_obj, entries):
     """Применяем булевы операции через модификаторы"""
@@ -941,6 +1017,8 @@ def create_red_material():
 def create_wall_number_labels(wall_info, red_material, label_size=0.5):
     labels = []
     print(f"    Создание меток стен: {len(wall_info)}")
+    # Все метки складываем в отдельную коллекцию
+    labels_collection = get_or_create_collection("WALL_LABELS")
     for wall_num, info in wall_info.items():
         cx, cy, cz = info['center']
         text_curve = bpy.data.curves.new(name=f"WallLabel_{wall_num}", type='FONT')
@@ -949,7 +1027,8 @@ def create_wall_number_labels(wall_info, red_material, label_size=0.5):
         text_curve.align_x = 'CENTER'
         text_curve.align_y = 'CENTER'
         text_obj = bpy.data.objects.new(f"Wall_Number_{wall_num}", text_curve)
-        bpy.context.collection.objects.link(text_obj)
+        # Линкуем метку в специальную коллекцию
+        labels_collection.objects.link(text_obj)
         # Размещаем метку над стеной: чуть выше верхней кромки стены
         text_obj.location = (cx, cy, WALL_HEIGHT + LABEL_Z_OFFSET)
         if text_obj.data.materials:
@@ -1184,6 +1263,119 @@ def visualize_wall_faces(src_obj, wall_number, collection_name="WALLS_DEBUG"):
     return obj
 
 
+def import_obj_to_collection(obj_path,
+                             target_collection="FLOOR3D_IMPORTED",
+                             wall_obj=None):
+    """Импортирует OBJ и переносит объекты в отдельную коллекцию.
+
+    Новый фильтр: импортируем только MESH-объекты, чья XY-середина НЕ лежит на основании
+    меша внешних стен (`Outline_Walls`).
+    - light/camera/empty и прочие не-MESH исключаются всегда
+    - если `wall_obj` не передан, ищем объект по имени "Outline_Walls"; если не нашли —
+      пропускаем фильтрацию по основанию и переносим все MESH (осторожно)
+    """
+    if not os.path.exists(obj_path):
+        print(f"    ⚠️ OBJ не найден: {obj_path}")
+        return []
+
+    before = set(o.name for o in bpy.data.objects)
+
+    # Импорт (Blender 4.x и 3.x)
+    try:
+        bpy.ops.wm.obj_import(filepath=obj_path, forward_axis='NEGATIVE_Z', up_axis='Y')
+    except AttributeError:
+        bpy.ops.import_scene.obj(filepath=obj_path, axis_forward='-Z', axis_up='Y')
+
+    imported = [o for o in bpy.data.objects if o.name not in before]
+    print(f"    Импортировано объектов из OBJ: {len(imported)}")
+
+    # Подготовим список XY-полигонов основания Outline_Walls
+    def get_wall_base_polys(wobj):
+        base_polys = []
+        if wobj is None or wobj.type != 'MESH':
+            return base_polys
+        mesh = wobj.data
+        mw = wobj.matrix_world
+        for poly in mesh.polygons:
+            # Берём нижние/верхние фаски; фильтруем около Z=0 для основания
+            if abs(poly.normal.z) < 0.5:
+                continue
+            zs = [ (mw @ mesh.vertices[i].co).z for i in poly.vertices ]
+            min_z = min(zs)
+            if abs(min_z - 0.0) > 1e-3:
+                continue
+            pts = [mw @ mesh.vertices[i].co for i in poly.vertices]
+            base_polys.append([(float(p.x), float(p.y)) for p in pts])
+        return base_polys
+
+    def pt_in_poly(pt, poly):
+        # ray casting в XY
+        x, y = pt
+        inside = False
+        n = len(poly)
+        for i in range(n):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % n]
+            if ((y1 > y) != (y2 > y)):
+                xinters = (x2 - x1) * (y - y1) / (y2 - y1 + 1e-12) + x1
+                if x < xinters:
+                    inside = not inside
+        return inside
+
+    def get_xy_center(obj):
+        # берём центр AABB в мировых координатах
+        bb = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+        xs = [p.x for p in bb]
+        ys = [p.y for p in bb]
+        return (float((min(xs)+max(xs))/2.0), float((min(ys)+max(ys))/2.0))
+
+    wref = wall_obj or bpy.data.objects.get("Outline_Walls")
+    base_polys = get_wall_base_polys(wref)
+    if base_polys:
+        print(f"    Базовых полигонов основания: {len(base_polys)}")
+    else:
+        print("    ⚠️ Основание Outline_Walls не найдено — фильтр по основанию отключён")
+
+    def keep(obj):
+        # Только меши (никакого света/камер/эмпти)
+        if obj.type != 'MESH':
+            return False
+        # Исключаем по имени только Outline_Merged (без учёта регистра)
+        name = obj.name.lower()
+        if 'outline_merged' in name:
+            return False
+        if not base_polys:
+            return True
+        cx, cy = get_xy_center(obj)
+        # Если центр попадает в любой полигон основания — не импортируем
+        for poly in base_polys:
+            if pt_in_poly((cx, cy), poly):
+                return False
+        return True
+
+    to_collect = [o for o in imported if keep(o)]
+    to_delete = [o for o in imported if o not in to_collect]
+    print(f"    В коллекцию уйдёт: {len(to_collect)} (удалено: {len(to_delete)})")
+
+    coll = get_or_create_collection(target_collection)
+    for obj in to_collect:
+        # убрать из всех коллекций
+        for c in list(obj.users_collection):
+            c.objects.unlink(obj)
+        # поместить в целевую
+        coll.objects.link(obj)
+
+    # Полностью удалить исключённые объекты из сцены/данных
+    for obj in to_delete:
+        try:
+            bpy.data.objects.remove(obj, do_unlink=True)
+        except Exception:
+            pass
+
+    print(f"    ✅ Объекты перенесены в коллекцию: {target_collection}")
+    return to_collect
+
+
 def export_obj(objs, output_path):
     """Экспортирует один объект или список объектов в OBJ."""
     bpy.ops.object.select_all(action='DESELECT')
@@ -1278,6 +1470,12 @@ def main():
     # Применяем булевы операции
     apply_boolean_operations(wall_obj, opening_entries)
 
+    # Заполняем проёмы новыми объектами (окна — голубые, двери — тёмно-коричневые)
+    try:
+        create_opening_fills(openings, opening_heights)
+    except Exception as e:
+        print(f"    ⚠️ Не удалось создать заполнители проёмов: {e}")
+
     # Финальная очистка
     merge_duplicate_vertices(wall_obj, 0.001)
     recalc_normals(wall_obj)
@@ -1288,6 +1486,14 @@ def main():
         assign_wall_materials(wall_obj, vertices)
     except Exception as e:
         print(f"    ⚠️  Не удалось назначить материалы стенам: {e}")
+
+    # Импорт 3D-объектов из OBJ и сбор в отдельную коллекцию:
+    # берём только те объекты, чья XY-середина НЕ лежит на основании Outline_Walls
+    try:
+        import_obj_to_collection(OBJ_HEIGHT_SOURCE_PATH, target_collection="FLOOR3D_IMPORTED",
+                                 wall_obj=wall_obj)
+    except Exception as e:
+        print(f"    ⚠️ Ошибка импорта OBJ в коллекцию: {e}")
 
     # Создаем фундамент, если есть данные
     foundation_obj = None
