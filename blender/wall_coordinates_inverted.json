@@ -2,7 +2,7 @@
   "metadata": {
     "source_file": "plan_floor1_objects.json",
     "wall_thickness": 22.0,
-    "timestamp": "2025-10-25T14:37:34.230678",
+    "timestamp": "2025-10-29T15:26:56.428950",
     "version": "1.0"
   },
   "junctions": [
@@ -1860,203 +1860,232 @@
         "y": 150.0,
         "junction_name": "J14",
         "junction_id": 14,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       },
       {
         "x": 876.0,
         "y": 151.0,
         "junction_name": "J6",
         "junction_id": 6,
-        "junction_type": "window_left_corner"
+        "junction_type": "window_left_corner",
+        "corner": 1
       },
       {
         "x": 875.0,
         "y": 220.0,
         "junction_name": "J28",
         "junction_id": 28,
-        "junction_type": "door_frame"
+        "junction_type": "door_frame",
+        "corner": 0
       },
       {
         "x": 875.0,
         "y": 375.0,
         "junction_name": "J34",
         "junction_id": 34,
-        "junction_type": "window_frame"
+        "junction_type": "window_frame",
+        "corner": 0
       },
       {
         "x": 876.0,
         "y": 616.0,
         "junction_name": "J12",
         "junction_id": 12,
-        "junction_type": "door_corner"
+        "junction_type": "door_corner",
+        "corner": 0
       },
       {
         "x": 875.0,
         "y": 677.0,
         "junction_name": "J32",
         "junction_id": 32,
-        "junction_type": "door_frame"
+        "junction_type": "door_frame",
+        "corner": 0
       },
       {
         "x": 875.0,
         "y": 738.0,
         "junction_name": "J38",
         "junction_id": 38,
-        "junction_type": "window_frame"
+        "junction_type": "window_frame",
+        "corner": 0
       },
       {
         "x": 876.0,
         "y": 975.0,
         "junction_name": "J4",
         "junction_id": 4,
-        "junction_type": "door_right_corner"
+        "junction_type": "door_right_corner",
+        "corner": 1
       },
       {
         "x": 813.0,
         "y": 978.0,
         "junction_name": "J18",
         "junction_id": 18,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       },
       {
         "x": 723.0,
         "y": 976.0,
         "junction_name": "J25",
         "junction_id": 25,
-        "junction_type": "wall_end"
+        "junction_type": "wall_end",
+        "corner": 0
       },
       {
         "x": 674.0,
         "y": 975.0,
         "junction_name": "J11",
         "junction_id": 11,
-        "junction_type": "wall_junction_l"
+        "junction_type": "wall_junction_l",
+        "corner": 0
       },
       {
         "x": 468.0,
         "y": 978.0,
         "junction_name": "J19",
         "junction_id": 19,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       },
       {
         "x": 337.0,
         "y": 976.0,
         "junction_name": "J26",
         "junction_id": 26,
-        "junction_type": "wall_end"
+        "junction_type": "wall_end",
+        "corner": 0
       },
       {
         "x": 304.0,
         "y": 977.0,
         "junction_name": "J10",
         "junction_id": 10,
-        "junction_type": "wall_junction_cross"
+        "junction_type": "wall_junction_cross",
+        "corner": 1
       },
       {
         "x": 304.0,
         "y": 1092.0,
         "junction_name": "J5",
         "junction_id": 5,
-        "junction_type": "door_right_corner"
+        "junction_type": "door_right_corner",
+        "corner": 1
       },
       {
         "x": 270.0,
         "y": 1090.0,
         "junction_name": "J20",
         "junction_id": 20,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       },
       {
         "x": 45.0,
         "y": 1091.0,
         "junction_name": "J27",
         "junction_id": 27,
-        "junction_type": "wall_end"
+        "junction_type": "wall_end",
+        "corner": 0
       },
       {
         "x": 10.0,
         "y": 1092.0,
         "junction_name": "J3",
         "junction_id": 3,
-        "junction_type": "door_left_corner"
+        "junction_type": "door_left_corner",
+        "corner": 1
       },
       {
         "x": 11.0,
         "y": 696.0,
         "junction_name": "J36",
         "junction_id": 36,
-        "junction_type": "window_frame"
+        "junction_type": "window_frame",
+        "corner": 0
       },
       {
         "x": 10.0,
         "y": 633.0,
         "junction_name": "J30",
         "junction_id": 30,
-        "junction_type": "door_frame"
+        "junction_type": "door_frame",
+        "corner": 0
       },
       {
         "x": 11.0,
         "y": 588.0,
         "junction_name": "J35",
         "junction_id": 35,
-        "junction_type": "window_frame"
+        "junction_type": "window_frame",
+        "corner": 0
       },
       {
         "x": 10.0,
         "y": 525.0,
         "junction_name": "J29",
         "junction_id": 29,
-        "junction_type": "door_frame"
+        "junction_type": "door_frame",
+        "corner": 0
       },
       {
         "x": 10.0,
         "y": 150.0,
         "junction_name": "J7",
         "junction_id": 7,
-        "junction_type": "window_right_corner"
+        "junction_type": "window_right_corner",
+        "corner": 1
       },
       {
         "x": 285.0,
         "y": 150.0,
         "junction_name": "J22",
         "junction_id": 22,
-        "junction_type": "wall_end"
+        "junction_type": "wall_end",
+        "corner": 0
       },
       {
         "x": 373.0,
         "y": 150.0,
         "junction_name": "J15",
         "junction_id": 15,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       },
       {
         "x": 375.0,
         "y": 150.0,
         "junction_name": "J21",
         "junction_id": 21,
-        "junction_type": "wall_end"
+        "junction_type": "wall_end",
+        "corner": 0
       },
       {
         "x": 468.0,
         "y": 151.0,
         "junction_name": "J16",
         "junction_id": 16,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       },
       {
         "x": 649.0,
         "y": 151.0,
         "junction_name": "J23",
         "junction_id": 23,
-        "junction_type": "wall_end"
+        "junction_type": "wall_end",
+        "corner": 0
       },
       {
         "x": 804.0,
         "y": 150.0,
         "junction_name": "J14",
         "junction_id": 14,
-        "junction_type": "wall_intersection"
+        "junction_type": "wall_intersection",
+        "corner": 0
       }
     ],
     "area": 748234.0,

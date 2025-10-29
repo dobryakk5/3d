@@ -29,14 +29,14 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 JSON_PATH = os.path.join(SCRIPT_DIR, "wall_coordinates_inverted.json")
 OUTPUT_OBJ = os.path.join(SCRIPT_DIR, "precise_building_outline_with_openings.obj")
 OBJ_HEIGHT_SOURCE_PATH = os.path.join(SCRIPT_DIR, "wall_coordinates_inverted_3d.obj")
-OUTPUT_NORMALS_JSON = os.path.join(SCRIPT_DIR, "external_normals.json")
+OUTPUT_NORMALS_JSON = os.path.join(SCRIPT_DIR, "mesh_normals.json")
 
 # Параметры фундамента 
 FOUNDATION_Z_OFFSET = 0.0   # верх фундамента на уровне низа здания
 FOUNDATION_THICKNESS = 0.75 # толщина фундамента в метрах
 EXPORT_LABELS_IN_OBJ = True   # при True метки-конвертируются в mesh и попадают в OBJ
 LABEL_Z_OFFSET = 0.05         # поднять метки на 5 см над стеной
-DEBUG_WALL_TO_VISUALIZE = 3   # номер стены для визуализации её граней (None, чтобы выключить)
+DEBUG_WALL_TO_VISUALIZE = None   # номер стены для визуализации её граней (None, чтобы выключить)
 
 # ---------------------------------
 # Вспомогательные функции
@@ -149,6 +149,169 @@ def get_outline_junctions_and_segments(data):
     print(f"    Ребер без bbox: {len(edges_without_bbox)}")
 
     return vertices, segments_with_bbox, edges_without_bbox
+
+def _median(vals):
+    s = sorted(vals)
+    n = len(s)
+    if n == 0:
+        return 0.0
+    m = n // 2
+    if n % 2:
+        return s[m]
+    return 0.5 * (s[m - 1] + s[m])
+
+def build_outline_runs(outline_vertices, scale_factor=SCALE_FACTOR):
+    """Строит участки стены только от угла (corner=1) до угла (corner=1).
+
+    Игнорирует промежуточные узлы (corner=0) — они не режут стену.
+    Для каждого участка вычисляет:
+      - axis: 'X' (вертикальная) или 'Y' (горизонтальная)
+      - plane: координата плоскости (x или y, м)
+      - span_min/span_max: диапазон вдоль продольной оси (м)
+      - start_junction_id/end_junction_id: ограничители участка
+    """
+    if not outline_vertices:
+        return []
+
+    verts = [
+        {
+            'x': float(v['x']) * scale_factor,
+            'y': float(v['y']) * scale_factor,
+            'corner': int(v.get('corner', 0)) == 1,
+            'junction_id': v.get('junction_id')
+        }
+        for v in outline_vertices
+    ]
+
+    corner_idx = [i for i, v in enumerate(verts) if v['corner']]
+    if len(corner_idx) < 2:
+        # нет двух углов — вернём пустой список, чтобы не создавать ложные стены
+        return []
+
+    runs = []
+    n = len(verts)
+    for k in range(len(corner_idx)):
+        i0 = corner_idx[k]
+        i1 = corner_idx[(k + 1) % len(corner_idx)]
+
+        seg = []
+        i = i0
+        while True:
+            seg.append(verts[i])
+            if i == i1:
+                break
+            i = (i + 1) % n
+
+        xs = [p['x'] for p in seg]
+        ys = [p['y'] for p in seg]
+        dx = (max(xs) - min(xs)) if xs else 0.0
+        dy = (max(ys) - min(ys)) if ys else 0.0
+
+        if dx >= dy:
+            axis = 'Y'
+            plane = _median(ys)
+            smin, smax = (min(xs), max(xs)) if xs else (0.0, 0.0)
+        else:
+            axis = 'X'
+            plane = _median(xs)
+            smin, smax = (min(ys), max(ys)) if ys else (0.0, 0.0)
+
+        runs.append({
+            'axis': axis,
+            'plane': plane,
+            'span_min': smin,
+            'span_max': smax,
+            'start_junction_id': seg[0].get('junction_id'),
+            'end_junction_id': seg[-1].get('junction_id'),
+            'source': 'corner_run'
+        })
+
+    print(f"    Контур (угол→угол): {len(runs)} участков")
+    for i, r in enumerate(runs[:20]):
+        print(f"      RunC #{i}: ось {r['axis']}, плоскость={r['plane']:.3f}, span=({r['span_min']:.3f}..{r['span_max']:.3f}), J{r['start_junction_id']}→J{r['end_junction_id']}")
+    if len(runs) > 20:
+        print(f"      ... ещё {len(runs) - 20} участков")
+    return runs
+
+
+def build_detailed_outline_runs(outline_vertices, segments_with_bbox, edges_without_bbox, scale_factor=SCALE_FACTOR):
+    """Создает участки контура (runs) по фактическим сегментам, чтобы ограничивать стены по длине.
+
+    Каждый run содержит:
+      - axis: 'X' (вертикальная стена, нормали ±X) или 'Y' (горизонтальная, нормали ±Y)
+      - plane: координата плоскости стены (x или y в метрах)
+      - span_min/span_max: продольный диапазон по оси протяженности (в метрах)
+      - start_junction_id/end_junction_id: идентификаторы ограничивающих узлов
+    """
+    runs = []
+
+    def add_run(axis, plane, smin, smax, meta=None):
+        if smin > smax:
+            smin, smax = smax, smin
+        entry = {'axis': axis, 'plane': plane, 'span_min': smin, 'span_max': smax}
+        if meta:
+            entry.update(meta)
+        runs.append(entry)
+
+    # 1) Сегменты с bbox (из openings и junctions)
+    for seg in segments_with_bbox:
+        bbox = seg.get('bbox') or {}
+        ori = seg.get('orientation') or bbox.get('orientation')
+        x = float(bbox.get('x', 0.0)) * scale_factor
+        y = float(bbox.get('y', 0.0)) * scale_factor
+        w = float(bbox.get('width', 0.0)) * scale_factor
+        h = float(bbox.get('height', 0.0)) * scale_factor
+
+        if ori == 'vertical':
+            axis = 'X'
+            plane = x + 0.5 * w
+            smin, smax = y, y + h
+        else:
+            axis = 'Y'
+            plane = y + 0.5 * h
+            smin, smax = x, x + w
+
+        add_run(axis, plane, smin, smax, meta={
+            'segment_id': seg.get('segment_id'),
+            'start_junction_id': seg.get('start_junction_id'),
+            'end_junction_id': seg.get('end_junction_id'),
+            'source': 'bbox',
+        })
+
+    # 2) Рёбра контура без bbox (между соседними вершинами)
+    for edge in edges_without_bbox:
+        v1 = edge.get('start_vertex') or {}
+        v2 = edge.get('end_vertex') or {}
+        x1 = float(v1.get('x', 0.0)) * scale_factor
+        y1 = float(v1.get('y', 0.0)) * scale_factor
+        x2 = float(v2.get('x', 0.0)) * scale_factor
+        y2 = float(v2.get('y', 0.0)) * scale_factor
+
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        if dx >= dy:
+            axis = 'Y'
+            plane = 0.5 * (y1 + y2)
+            smin, smax = min(x1, x2), max(x1, x2)
+        else:
+            axis = 'X'
+            plane = 0.5 * (x1 + x2)
+            smin, smax = min(y1, y2), max(y1, y2)
+
+        add_run(axis, plane, smin, smax, meta={
+            'start_junction_id': edge.get('start_junction_id'),
+            'end_junction_id': edge.get('end_junction_id'),
+            'source': 'edge',
+        })
+
+    # Лёгкая сортировка для стабильного вывода
+    runs.sort(key=lambda r: (r['axis'], round(r['plane'], 4), round(r['span_min'], 4)))
+    print(f"    Детализированных участков (по сегментам): {len(runs)}")
+    for i, r in enumerate(runs[:20]):
+        print(f"      RunD #{i}: ось {r['axis']}, плоскость={r['plane']:.3f}, span=({r['span_min']:.3f}..{r['span_max']:.3f}), src={r.get('source')}")
+    if len(runs) > 20:
+        print(f"      ... ещё {len(runs) - 20} участков")
+    return runs
 
 
 def create_rectangle_from_bbox(bbox, scale_factor=SCALE_FACTOR):
@@ -476,6 +639,7 @@ def identify_and_number_walls_from_mesh(
     min_face_count=4,
     min_wall_length=WALL_THICKNESS_PX * SCALE_FACTOR,
     merge_position_eps=WALL_THICKNESS_PX * SCALE_FACTOR * 1.1,
+    outline_runs=None,
 ):
     """Группирует грани в стены и присваивает номера.
 
@@ -503,6 +667,7 @@ def identify_and_number_walls_from_mesh(
     faces_with_dom = 0
     faces_without_dom = 0
 
+    face_meta = []
     for face in bm.faces:
         n = face.normal.copy()
         n.normalize()
@@ -523,60 +688,125 @@ def identify_and_number_walls_from_mesh(
         faces_with_dom += 1
 
         c = face.calc_center_median()
-        # Позиция стены — по плоскости: для оси 'X' (нормаль ±X) используем X,
-        # для оси 'Y' (нормаль ±Y) используем Y
-        position = c.x if axis == 'X' else c.y
+        plane_pos = c.x if axis == 'X' else c.y
+        along_pos = c.y if axis == 'X' else c.x
 
-        group_key = None
-        for key in wall_groups.keys():
-            key_axis, key_sign, key_pos = key
-            if key_axis == axis and key_sign == sign and abs(position - key_pos) < position_tolerance:
-                group_key = key
-                break
-        if group_key is None:
-            group_key = (axis, sign, position)
-            wall_groups[group_key] = []
-        wall_groups[group_key].append(face)
+        face_meta.append({
+            'face': face,
+            'axis': axis,
+            'sign': sign,
+            'plane_pos': plane_pos,
+            'along_pos': along_pos,
+        })
+
+    if outline_runs:
+        # Привязка по детальным участкам: ограничиваем по плоскости и длине
+        plane_tol = WALL_THICKNESS_PX * SCALE_FACTOR * 1.25
+        span_eps = 0.02  # 2 см запас по длине
+        for idx, run in enumerate(outline_runs):
+            axis = run['axis']
+            plane = run['plane']
+            smin = run['span_min'] - span_eps
+            smax = run['span_max'] + span_eps
+
+            buckets = {+1: [], -1: []}
+            for fm in face_meta:
+                if fm['axis'] != axis:
+                    continue
+                if abs(fm['plane_pos'] - plane) > plane_tol:
+                    continue
+                if smin <= fm['along_pos'] <= smax:
+                    buckets[fm['sign']].append(fm['face'])
+
+            for sign, faces in buckets.items():
+                if faces:
+                    wall_groups[(axis, sign, plane, idx)] = faces
+    else:
+        # Старая схема: группируем по близкой плоскости
+        for fm in face_meta:
+            axis = fm['axis']
+            sign = fm['sign']
+            position = fm['plane_pos']
+            group_key = None
+            for key in wall_groups.keys():
+                key_axis, key_sign, key_pos = key
+                if key_axis == axis and key_sign == sign and abs(position - key_pos) < position_tolerance:
+                    group_key = key
+                    break
+            if group_key is None:
+                group_key = (axis, sign, position)
+                wall_groups[group_key] = []
+            wall_groups[group_key].append(fm['face'])
 
     # 1) Объединяем группы по близкой позиции (игнорируя знак нормали)
     merged = []
-    for (axis, sign, position), faces in wall_groups.items():
-        # Найдём кластер с той же осью и близкой позицией
-        cluster_idx = None
-        for i, cluster in enumerate(merged):
-            if cluster['axis'] != axis:
-                continue
-            if abs(position - cluster['position']) < merge_position_eps:
-                cluster_idx = i
-                break
-        if cluster_idx is None:
+    if outline_runs:
+        # Группы уже разбиты по участкам — не объединяем между run'ами
+        for key, faces in wall_groups.items():
+            axis, sign, position, run_idx = key
             merged.append({
                 'axis': axis,
                 'position': position,
                 'faces': list(faces),
-                'sign_counts': {sign: len(faces)}
+                'sign_counts': {sign: len(faces)},
+                'run_idx': run_idx,
             })
-        else:
-            cluster = merged[cluster_idx]
-            cluster['faces'].extend(faces)
-            cluster['sign_counts'][sign] = cluster['sign_counts'].get(sign, 0) + len(faces)
-            # Уточняем позицию как среднее
-            cluster['position'] = (cluster['position'] + position) / 2.0
+    else:
+        for (axis, sign, position), faces in wall_groups.items():
+            # Найдём кластер с той же осью и близкой позицией
+            cluster_idx = None
+            for i, cluster in enumerate(merged):
+                if cluster['axis'] != axis:
+                    continue
+                if abs(position - cluster['position']) < merge_position_eps:
+                    cluster_idx = i
+                    break
+            if cluster_idx is None:
+                merged.append({
+                    'axis': axis,
+                    'position': position,
+                    'faces': list(faces),
+                    'sign_counts': {sign: len(faces)}
+                })
+            else:
+                cluster = merged[cluster_idx]
+                cluster['faces'].extend(faces)
+                cluster['sign_counts'][sign] = cluster['sign_counts'].get(sign, 0) + len(faces)
+                # Уточняем позицию как среднее
+                cluster['position'] = (cluster['position'] + position) / 2.0
 
     # 2) Фильтруем кластеры по количеству граней и длине стены
     filtered_clusters = []
     for cluster in merged:
         faces = cluster['faces']
-        if len(faces) < min_face_count:
+        # При привязке к runs допускаем минимум 1 грань (в прямоугольнике обычно 1 грань/знак)
+        min_faces_needed = 1 if ('run_idx' in cluster and outline_runs) else min_face_count
+        if len(faces) < min_faces_needed:
             continue
-        if cluster['axis'] == 'X':
-            # стена тянется по Y
-            vals = [f.calc_center_median().y for f in faces]
-        else:  # 'Y': стена тянется по X
-            vals = [f.calc_center_median().x for f in faces]
-        if not vals:
-            continue
-        span = max(vals) - min(vals)
+
+        # Длина стены: по центрам граней (обычный режим) или по самому run (режим runs)
+        if 'run_idx' in cluster and outline_runs:
+            try:
+                r = outline_runs[cluster['run_idx']]
+                span = float(r['span_max']) - float(r['span_min'])
+            except Exception:
+                # fallback — по центрам граней
+                if cluster['axis'] == 'X':
+                    vals = [f.calc_center_median().y for f in faces]
+                else:
+                    vals = [f.calc_center_median().x for f in faces]
+                if not vals:
+                    continue
+                span = max(vals) - min(vals)
+        else:
+            if cluster['axis'] == 'X':
+                vals = [f.calc_center_median().y for f in faces]
+            else:  # 'Y'
+                vals = [f.calc_center_median().x for f in faces]
+            if not vals:
+                continue
+            span = max(vals) - min(vals)
+
         if span < min_wall_length:
             continue
         cluster['span'] = span
@@ -660,6 +890,16 @@ def identify_and_number_walls_from_mesh(
             'center': (cx, cy, cz),
             'sign': '+' if sign > 0 else '-',
         }
+        # Если кластер соответствует детальному run — добавим служебные поля
+        if 'run_idx' in cluster:
+            ri = int(cluster['run_idx'])
+            wall_info[wall_number]['run_idx'] = ri
+            try:
+                r = outline_runs[ri]
+                wall_info[wall_number]['start_junction_id'] = r.get('start_junction_id')
+                wall_info[wall_number]['end_junction_id'] = r.get('end_junction_id')
+            except Exception:
+                pass
         wall_number += 1
 
     bmesh.update_edit_mesh(obj.data)
@@ -667,7 +907,12 @@ def identify_and_number_walls_from_mesh(
 
     print(f"    Стены: {len(wall_info)} (с доминантной нормалью граней: {faces_with_dom}, без: {faces_without_dom})")
     for wn, info in wall_info.items():
-        print(f"      Стена #{wn}: ось {info['axis']}{info['sign']}, позиция={info['position']:.2f}м, граней={info['face_count']}")
+        extra = ""
+        if 'run_idx' in info:
+            sj = info.get('start_junction_id')
+            ej = info.get('end_junction_id')
+            extra = f", run={info['run_idx']} (J{sj}→J{ej})"
+        print(f"      Стена #{wn}: ось {info['axis']}{info['sign']}, позиция={info['position']:.2f}м, граней={info['face_count']}{extra}")
     return wall_info
 
 
@@ -747,6 +992,13 @@ def save_wall_normals_to_json(wall_info, path=OUTPUT_NORMALS_JSON):
             'center': [float(c) for c in info['center']],
             'face_count': int(info['face_count'])
         }
+        # Служебные поля, если присутствуют
+        if 'run_idx' in info:
+            payload[str(wall_num)]['run_idx'] = int(info['run_idx'])
+        if 'start_junction_id' in info:
+            payload[str(wall_num)]['start_junction_id'] = info['start_junction_id']
+        if 'end_junction_id' in info:
+            payload[str(wall_num)]['end_junction_id'] = info['end_junction_id']
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
@@ -771,6 +1023,118 @@ def create_highlight_material(name="WallFacesHighlight", color=(0.1, 0.9, 0.2, 1
     except Exception:
         pass
     return mat
+
+
+def get_or_create_material(name, color=(1.0, 1.0, 1.0, 1.0)):
+    """Создаёт или возвращает материал с заданным именем и цветом."""
+    if name in bpy.data.materials:
+        mat = bpy.data.materials[name]
+    else:
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+    mat.diffuse_color = color
+    try:
+        if mat.use_nodes:
+            nodes = mat.node_tree.nodes
+            # Найдем Principled BSDF или создадим
+            bsdf = nodes.get('Principled BSDF')
+            if bsdf is None:
+                bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+                out = nodes.get('Material Output') or nodes.new(type='ShaderNodeOutputMaterial')
+                mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+            bsdf.inputs['Base Color'].default_value = color
+    except Exception:
+        pass
+    return mat
+
+
+def compute_outline_centroid(outline_vertices):
+    """Вычисляет центроид по вершинам контура (в метрах)."""
+    if not outline_vertices:
+        return 0.0, 0.0
+    xs = [float(v['x']) * SCALE_FACTOR for v in outline_vertices]
+    ys = [float(v['y']) * SCALE_FACTOR for v in outline_vertices]
+    cx = sum(xs) / len(xs)
+    cy = sum(ys) / len(ys)
+    return cx, cy
+
+
+def assign_wall_materials(obj, outline_vertices,
+                          outer_color=(1.0, 1.0, 0.0, 1.0),  # жёлтый
+                          inner_color=(1.0, 1.0, 1.0, 1.0)):  # белый
+    """Назначает материал фасадам: внешние — жёлтые, внутренние — белые.
+
+    Робастный критерий: делаем небольшой шаг от центра грани вдоль её 2D-нормали
+    и проверяем, остаётся ли точка внутри полигона внешнего контура здания.
+      - если выходит за контур → грань внешняя (жёлтая)
+      - иначе → внутренняя (белая)
+
+    Верх/низ (нормали по Z) получают внутренний материал.
+    """
+    if obj is None or obj.type != 'MESH':
+        return
+
+    # Подготовим 2D-полигон контура
+    outline_poly = [(float(v['x']) * SCALE_FACTOR, float(v['y']) * SCALE_FACTOR) for v in outline_vertices]
+    if len(outline_poly) < 3:
+        print("    ⚠️  Недостаточно вершин контура для определения внешних граней")
+        return
+
+    def point_in_polygon(pt, poly):
+        # Алгоритм ray casting (луч вправо)
+        x, y = pt
+        inside = False
+        n = len(poly)
+        for i in range(n):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % n]
+            if ((y1 > y) != (y2 > y)):
+                xinters = (x2 - x1) * (y - y1) / (y2 - y1 + 1e-12) + x1
+                if x < xinters:
+                    inside = not inside
+        return inside
+
+    # Материалы
+    outer_mat = get_or_create_material("OuterWall_Yellow", outer_color)
+    inner_mat = get_or_create_material("InnerWall_White", inner_color)
+
+    mats = obj.data.materials
+    # Убедимся, что оба материала есть в слотах
+    name_to_index = {m.name: i for i, m in enumerate(mats)}
+    if outer_mat.name not in name_to_index:
+        mats.append(outer_mat)
+        name_to_index[outer_mat.name] = len(mats) - 1
+    if inner_mat.name not in name_to_index:
+        mats.append(inner_mat)
+        name_to_index[inner_mat.name] = len(mats) - 1
+
+    outer_idx = name_to_index[outer_mat.name]
+    inner_idx = name_to_index[inner_mat.name]
+
+    # Присваиваем материал полигонам
+    eps = max(WALL_THICKNESS_PX * SCALE_FACTOR * 0.45, 0.05)  # ≈ половина толщины, но не < 5см
+    for poly in obj.data.polygons:
+        n = poly.normal
+        # Пропустим верх/низ (нормаль почти по Z)
+        if abs(n.z) > 0.5:
+            poly.material_index = inner_idx
+            continue
+        center = obj.matrix_world @ poly.center if obj.parent else poly.center
+        cx, cy = float(center.x), float(center.y)
+        nx, ny = float(n.x), float(n.y)
+        # нормируем 2D-нормаль
+        L = (nx * nx + ny * ny) ** 0.5
+        if L < 1e-6:
+            poly.material_index = inner_idx
+            continue
+        nx /= L
+        ny /= L
+        # точка вне вдоль нормали
+        px_out = (cx + nx * eps, cy + ny * eps)
+        is_outside = not point_in_polygon(px_out, outline_poly)
+        poly.material_index = outer_idx if is_outside else inner_idx
+
+    print("    ✅ Материалы назначены: внешние — жёлтый, внутренние — белый")
 
 
 def visualize_wall_faces(src_obj, wall_number, collection_name="WALLS_DEBUG"):
@@ -877,10 +1241,13 @@ def main():
 
     # Идентификация стен + нумерация и метки (до создания проёмов и фундамента)
     print("\n[WALLS] Идентификация, нумерация и метки (до проёмов)")
+    # Участки только от угла к углу (corner=1 → corner=1)
+    outline_runs = build_outline_runs(vertices)
     wall_info = identify_and_number_walls_from_mesh(
         wall_obj,
         position_tolerance=0.15,
         normal_threshold=0.7,
+        outline_runs=outline_runs,
     )
     print(f"    Найдено стен: {len(wall_info)}")
     for wn, info in wall_info.items():
@@ -915,6 +1282,12 @@ def main():
     merge_duplicate_vertices(wall_obj, 0.001)
     recalc_normals(wall_obj)
     cleanup_mesh(wall_obj)
+
+    # Назначаем материалы стенам: внешний контур — жёлтый, внутренние — белый
+    try:
+        assign_wall_materials(wall_obj, vertices)
+    except Exception as e:
+        print(f"    ⚠️  Не удалось назначить материалы стенам: {e}")
 
     # Создаем фундамент, если есть данные
     foundation_obj = None

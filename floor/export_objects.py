@@ -1438,8 +1438,14 @@ def find_building_outline_from_junctions(junctions, pillar_polygons=None, openin
                     break
         
         if can_close_directly:
-            # Замыкаем контур
-            outline_points.append(start_point)
+            # Замыкаем контур, добавляя вторую точку контура вместо дублирования начальной
+            # Это предотвращает создание ложной угловой точки при анализе трендов
+            if len(outline_points) > 1:
+                second_point = outline_points[1]
+                outline_points.append(second_point)
+            else:
+                # Если по какой-то причине в контуре только одна точка, добавляем начальную
+                outline_points.append(start_point)
         else:
             # Ищем промежуточные точки для замыкания контура
             # Находим ближайшую непосещенную точку к начальной
@@ -1474,7 +1480,16 @@ def find_building_outline_from_junctions(junctions, pillar_polygons=None, openin
     
     # Создаем полигон с информацией о junctions для каждой вершины
     vertices = []
-    for p in outline_points:
+    for i, p in enumerate(outline_points):
+        # Пропускаем последнюю точку, если она была добавлена для замыкания контура
+        # (это вторая точка контура, добавленная в конец для замыкания)
+        if i == len(outline_points) - 1 and len(outline_points) > 1:
+            # Проверяем, является ли последняя точка дубликатом второй точки
+            second_point = outline_points[1] if len(outline_points) > 1 else None
+            if second_point and abs(p['x'] - second_point['x']) < 1 and abs(p['y'] - second_point['y']) < 1:
+                # Пропускаем добавление этой точки в vertices
+                continue
+        
         # Находим соответствующий junction в исходном списке
         junction_id = None
         junction_type = None
@@ -2671,8 +2686,14 @@ def main():
                 json_data["openings"]
             )
             if building_outline:
+                # Определяем угловые точки в building_outline
+                building_outline = detect_corner_points(building_outline, wall_thickness_pixels)
                 json_data["building_outline"] = building_outline
+                
+                # Считаем количество угловых точек
+                corner_count = sum(1 for vertex in building_outline['vertices'] if vertex.get('corner', 0) == 1)
                 print(f"   Building outline created: {building_outline['area']:.1f} sq.px, perimeter: {building_outline['perimeter']:.1f} px")
+                print(f"   Corner points detected: {corner_count}/{len(building_outline['vertices'])}")
             else:
                 print("   No filtered junctions found for building outline creation")
         except Exception as e:
@@ -2814,6 +2835,74 @@ def test_foundation_creation():
     # min_x: 50, max_x: 200, min_y: 50, max_y: 200
     
     return foundation
+
+def detect_corner_points(building_outline, wall_thickness_pixels):
+    """
+    Определяет угловые точки в building_outline на основе изменения тренда координат
+    
+    Args:
+        building_outline: Словарь с контуром здания, содержащий vertices
+        wall_thickness_pixels: Толщина стены в пикселях для определения порога
+        
+    Returns:
+        building_outline: Обновленный контур здания с полем corner для каждой вершины
+    """
+    if not building_outline or 'vertices' not in building_outline:
+        return building_outline
+    
+    vertices = building_outline['vertices']
+    if len(vertices) < 3:
+        return building_outline
+    
+    # Порог для определения значительного изменения координат
+    threshold = wall_thickness_pixels / 2.0
+    
+    # Инициализируем все вершины как неугловые
+    for vertex in vertices:
+        vertex['corner'] = 0
+    
+    # Определяем тренды между последовательными точками
+    trends = []
+    
+    for i in range(len(vertices)):
+        curr = vertices[i]
+        next_vertex = vertices[(i + 1) % len(vertices)]  # Замыкаем контур
+        
+        dx = abs(next_vertex['x'] - curr['x'])
+        dy = abs(next_vertex['y'] - curr['y'])
+        
+        # Определяем основной тренд для этого сегмента
+        # Особый случай: если точки совпадают, тренд не определен
+        if dx == 0 and dy == 0:
+            trends.append('NONE')  # Точки совпадают
+        elif dx > threshold and dy <= threshold:
+            trends.append('X')  # Движение преимущественно по X
+        elif dy > threshold and dx <= threshold:
+            trends.append('Y')  # Движение преимущественно по Y
+        else:
+            # Если оба изменения значительны или оба незначительны,
+            # выбираем большее изменение
+            if dx > dy:
+                trends.append('X')
+            else:
+                trends.append('Y')
+    
+    # Определяем угловые точки (где меняется тренд)
+    # Первая точка - угловая, если тренд от последней к первой отличается от тренда от первой ко второй
+    # И если тренд от последней к первой не равен 'NONE' (точки не совпадают)
+    if trends[-1] != 'NONE' and trends[0] != 'NONE' and trends[-1] != trends[0]:
+        vertices[0]['corner'] = 1
+    
+    # Проверяем остальные точки
+    for i in range(1, len(vertices)):
+        prev_trend = trends[i - 1]  # Тренд от предыдущей точки к текущей
+        curr_trend = trends[i]       # Тренд от текущей точки к следующей
+        
+        # Если тренд изменился - это угловая точка
+        if prev_trend != curr_trend:
+            vertices[i]['corner'] = 1
+    
+    return building_outline
 
 if __name__ == '__main__':
     main()
