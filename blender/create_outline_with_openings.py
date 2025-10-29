@@ -5,8 +5,10 @@
 """
 
 import bpy
+import bmesh
 import os
 import json
+from mathutils import Vector
 
 # ---------------------------------
 # Константы
@@ -27,6 +29,14 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 JSON_PATH = os.path.join(SCRIPT_DIR, "wall_coordinates_inverted.json")
 OUTPUT_OBJ = os.path.join(SCRIPT_DIR, "precise_building_outline_with_openings.obj")
 OBJ_HEIGHT_SOURCE_PATH = os.path.join(SCRIPT_DIR, "wall_coordinates_inverted_3d.obj")
+OUTPUT_NORMALS_JSON = os.path.join(SCRIPT_DIR, "external_normals.json")
+
+# Параметры фундамента 
+FOUNDATION_Z_OFFSET = 0.0   # верх фундамента на уровне низа здания
+FOUNDATION_THICKNESS = 0.75 # толщина фундамента в метрах
+EXPORT_LABELS_IN_OBJ = True   # при True метки-конвертируются в mesh и попадают в OBJ
+LABEL_Z_OFFSET = 0.05         # поднять метки на 5 см над стеной
+DEBUG_WALL_TO_VISUALIZE = 3   # номер стены для визуализации её граней (None, чтобы выключить)
 
 # ---------------------------------
 # Вспомогательные функции
@@ -246,6 +256,60 @@ def create_wall_mesh(rectangles, wall_height=WALL_HEIGHT):
     return obj
 
 
+def create_foundation(foundation_data, z_offset=FOUNDATION_Z_OFFSET, thickness=FOUNDATION_THICKNESS, scale_factor=SCALE_FACTOR):
+    """Создает 3D меш фундамента из данных JSON (как в merge_with_remesh_fine.py)."""
+    if not foundation_data or 'vertices' not in foundation_data:
+        print("    ⚠️  Данные фундамента не найдены в JSON")
+        return None
+
+    vertices_2d = foundation_data['vertices']
+
+    mesh = bpy.data.meshes.new(name="Foundation_Mesh")
+    foundation_obj = bpy.data.objects.new("Foundation", mesh)
+    bpy.context.collection.objects.link(foundation_obj)
+
+    vertices = []
+    for v in vertices_2d:
+        vertices.append((v['x'] * scale_factor, v['y'] * scale_factor, z_offset))
+    for v in vertices_2d:
+        vertices.append((v['x'] * scale_factor, v['y'] * scale_factor, z_offset - thickness))
+
+    num_verts = len(vertices_2d)
+    faces = []
+    top_face = list(range(num_verts))
+    faces.append(top_face)
+    bottom_face = list(range(num_verts, 2 * num_verts))
+    bottom_face.reverse()
+    faces.append(bottom_face)
+    for i in range(num_verts):
+        next_i = (i + 1) % num_verts
+        face = [i, next_i, next_i + num_verts, i + num_verts]
+        faces.append(face)
+
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+
+    bpy.context.view_layer.objects.active = foundation_obj
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Материал тёмно-серый
+    mat = bpy.data.materials.new(name="Foundation_Material_Dark_Gray")
+    mat.use_nodes = True
+    try:
+        mat.node_tree.nodes["Principled BSDF"].inputs[0].default_value = (0.2, 0.2, 0.2, 1.0)
+    except Exception:
+        pass
+    foundation_obj.data.materials.append(mat)
+
+    print(f"    Создан фундамент: {len(vertices)} вершин, {len(faces)} граней")
+    print(f"    Z: {z_offset}м до {z_offset - thickness}м, толщина: {thickness}м")
+
+    return foundation_obj
+
+
 def merge_duplicate_vertices(obj, distance):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.mode_set(mode='EDIT')
@@ -402,26 +466,389 @@ def cleanup_mesh(obj):
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def export_obj(obj, output_path):
-    bpy.ops.object.select_all(action='DESELECT')
-    obj.select_set(True)
+# -------------------------------
+# Идентификация стен и метки
+# -------------------------------
+def identify_and_number_walls_from_mesh(
+    obj,
+    position_tolerance=0.1,
+    normal_threshold=0.9,
+    min_face_count=4,
+    min_wall_length=WALL_THICKNESS_PX * SCALE_FACTOR,
+    merge_position_eps=WALL_THICKNESS_PX * SCALE_FACTOR * 1.1,
+):
+    """Группирует грани в стены и присваивает номера.
+
+    Принципы:
+    - Граним задаём доминантную ось по нормали (±X или ±Y), позицию берём по поперечной оси.
+    - Сначала объединяем группы с близкой позицией (игнорируя знак нормали),
+      затем фильтруем кластеры по общему количеству граней и длине стены.
+    - Длину измеряем по оси протяженности: для оси 'X' длина по Y; для оси 'Y' длина по X.
+    """
     bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    bm = bmesh.from_edit_mesh(obj.data)
+
+    # integer слой для номера стены
+    wall_num_layer = bm.faces.layers.int.get("wall_number")
+    if wall_num_layer is None:
+        wall_num_layer = bm.faces.layers.int.new("wall_number")
+
+    for f in bm.faces:
+        f[wall_num_layer] = -1
+
+    wall_groups = {}
+
+    faces_with_dom = 0
+    faces_without_dom = 0
+
+    for face in bm.faces:
+        n = face.normal.copy()
+        n.normalize()
+        nx, ny = n.x, n.y
+
+        axis = None
+        sign = 0
+        if abs(nx) > normal_threshold:
+            axis = 'X'
+            sign = 1 if nx > 0 else -1
+        elif abs(ny) > normal_threshold:
+            axis = 'Y'
+            sign = 1 if ny > 0 else -1
+
+        if axis is None:
+            faces_without_dom += 1
+            continue
+        faces_with_dom += 1
+
+        c = face.calc_center_median()
+        # Позиция стены — по плоскости: для оси 'X' (нормаль ±X) используем X,
+        # для оси 'Y' (нормаль ±Y) используем Y
+        position = c.x if axis == 'X' else c.y
+
+        group_key = None
+        for key in wall_groups.keys():
+            key_axis, key_sign, key_pos = key
+            if key_axis == axis and key_sign == sign and abs(position - key_pos) < position_tolerance:
+                group_key = key
+                break
+        if group_key is None:
+            group_key = (axis, sign, position)
+            wall_groups[group_key] = []
+        wall_groups[group_key].append(face)
+
+    # 1) Объединяем группы по близкой позиции (игнорируя знак нормали)
+    merged = []
+    for (axis, sign, position), faces in wall_groups.items():
+        # Найдём кластер с той же осью и близкой позицией
+        cluster_idx = None
+        for i, cluster in enumerate(merged):
+            if cluster['axis'] != axis:
+                continue
+            if abs(position - cluster['position']) < merge_position_eps:
+                cluster_idx = i
+                break
+        if cluster_idx is None:
+            merged.append({
+                'axis': axis,
+                'position': position,
+                'faces': list(faces),
+                'sign_counts': {sign: len(faces)}
+            })
+        else:
+            cluster = merged[cluster_idx]
+            cluster['faces'].extend(faces)
+            cluster['sign_counts'][sign] = cluster['sign_counts'].get(sign, 0) + len(faces)
+            # Уточняем позицию как среднее
+            cluster['position'] = (cluster['position'] + position) / 2.0
+
+    # 2) Фильтруем кластеры по количеству граней и длине стены
+    filtered_clusters = []
+    for cluster in merged:
+        faces = cluster['faces']
+        if len(faces) < min_face_count:
+            continue
+        if cluster['axis'] == 'X':
+            # стена тянется по Y
+            vals = [f.calc_center_median().y for f in faces]
+        else:  # 'Y': стена тянется по X
+            vals = [f.calc_center_median().x for f in faces]
+        if not vals:
+            continue
+        span = max(vals) - min(vals)
+        if span < min_wall_length:
+            continue
+        cluster['span'] = span
+        filtered_clusters.append(cluster)
+
+    print(f"    Кластеризация: групп={len(wall_groups)}, кластеров={len(merged)}, после фильтра={len(filtered_clusters)}")
+
+    # 3) Нумерация финальных стен
+    wall_info = {}
+    wall_number = 0
+    for cluster in filtered_clusters:
+        axis = cluster['axis']
+        faces = cluster['faces']
+        # Робастное определение плоскости (позиции) и центра стены
+        face_centers = [f.calc_center_median() for f in faces]
+        xs = [c.x for c in face_centers]
+        ys = [c.y for c in face_centers]
+        zs = [c.z for c in face_centers]
+
+        def _median(vals):
+            s = sorted(vals)
+            n = len(s)
+            if n == 0:
+                return 0.0
+            mid = n // 2
+            if n % 2 == 1:
+                return s[mid]
+            return 0.5 * (s[mid-1] + s[mid])
+
+        def _percentile(vals, q):
+            """Квантиль q (0..1) по упорядоченному списку."""
+            if not vals:
+                return 0.0
+            s = sorted(vals)
+            n = len(s)
+            if n == 1:
+                return s[0]
+            i = q * (n - 1)
+            lo = int(i)
+            hi = min(lo + 1, n - 1)
+            frac = i - lo
+            return s[lo] * (1.0 - frac) + s[hi] * frac
+
+        if axis == 'X':
+            # Плоскость x ≈ const, длина по Y
+            plane = _median(xs)
+            # Усеченные границы (10..90 перцентиль) по длине, чтобы игнорировать выбросы
+            if ys:
+                y_lo = _percentile(ys, 0.10)
+                y_hi = _percentile(ys, 0.90)
+            else:
+                y_lo = y_hi = 0.0
+            cx, cy = plane, 0.5 * (y_lo + y_hi)
+        else:  # 'Y'
+            # Плоскость y ≈ const, длина по X
+            plane = _median(ys)
+            if xs:
+                x_lo = _percentile(xs, 0.10)
+                x_hi = _percentile(xs, 0.90)
+            else:
+                x_lo = x_hi = 0.0
+            cx, cy = 0.5 * (x_lo + x_hi), plane
+
+        cz = sum(zs) / len(zs) if zs else WALL_HEIGHT * 0.5
+        position = plane
+        # Выбираем направление по знаку с большим числом граней
+        sign = 1
+        if cluster['sign_counts']:
+            sign = max(cluster['sign_counts'].items(), key=lambda kv: kv[1])[0]
+
+        for f in faces:
+            f[wall_num_layer] = wall_number
+
+        direction = (sign, 0) if axis == 'X' else (0, sign)
+
+        wall_info[wall_number] = {
+            'direction': direction,
+            'position': position,
+            'axis': axis,
+            'face_count': len(faces),
+            'center': (cx, cy, cz),
+            'sign': '+' if sign > 0 else '-',
+        }
+        wall_number += 1
+
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    print(f"    Стены: {len(wall_info)} (с доминантной нормалью граней: {faces_with_dom}, без: {faces_without_dom})")
+    for wn, info in wall_info.items():
+        print(f"      Стена #{wn}: ось {info['axis']}{info['sign']}, позиция={info['position']:.2f}м, граней={info['face_count']}")
+    return wall_info
+
+
+def create_red_material():
+    name = "RedLabelMaterial"
+    if name in bpy.data.materials:
+        bpy.data.materials.remove(bpy.data.materials[name])
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    # diffuse для экспорта
+    mat.diffuse_color = (1.0, 0.0, 0.0, 1.0)
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    nodes.clear()
+    out = nodes.new(type='ShaderNodeOutputMaterial')
+    bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    bsdf.inputs['Base Color'].default_value = (1.0, 0.0, 0.0, 1.0)
+    if 'Specular IOR Level' in bsdf.inputs:
+        bsdf.inputs['Specular IOR Level'].default_value = 0.5
+    elif 'Specular' in bsdf.inputs:
+        bsdf.inputs['Specular'].default_value = 0.5
+    links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+    return mat
+
+
+def create_wall_number_labels(wall_info, red_material, label_size=0.5):
+    labels = []
+    print(f"    Создание меток стен: {len(wall_info)}")
+    for wall_num, info in wall_info.items():
+        cx, cy, cz = info['center']
+        text_curve = bpy.data.curves.new(name=f"WallLabel_{wall_num}", type='FONT')
+        text_curve.body = str(wall_num)
+        text_curve.size = label_size
+        text_curve.align_x = 'CENTER'
+        text_curve.align_y = 'CENTER'
+        text_obj = bpy.data.objects.new(f"Wall_Number_{wall_num}", text_curve)
+        bpy.context.collection.objects.link(text_obj)
+        # Размещаем метку над стеной: чуть выше верхней кромки стены
+        text_obj.location = (cx, cy, WALL_HEIGHT + LABEL_Z_OFFSET)
+        if text_obj.data.materials:
+            text_obj.data.materials[0] = red_material
+        else:
+            text_obj.data.materials.append(red_material)
+        labels.append(text_obj)
+    print(f"    ✅ Меток создано: {len(labels)}")
+    return labels
+
+
+def convert_text_labels_to_mesh(labels):
+    """Конвертирует текстовые метки в mesh, чтобы они попали в OBJ экспорт."""
+    converted = []
+    for obj in labels:
+        if obj.type == 'FONT':
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = obj
+            obj.select_set(True)
+            try:
+                bpy.ops.object.convert(target='MESH', keep_original=False)
+                converted.append(obj)
+            except Exception as e:
+                print(f"    ⚠️  Не удалось конвертировать метку {obj.name} в mesh: {e}")
+        else:
+            converted.append(obj)
+    print(f"    Меток для экспорта (mesh): {len(converted)}")
+    return converted
+
+
+def save_wall_normals_to_json(wall_info, path=OUTPUT_NORMALS_JSON):
+    """Сохраняет нормали и информацию о стенах в JSON файл."""
+    payload = {}
+    for wall_num, info in wall_info.items():
+        payload[str(wall_num)] = {
+            'direction': [float(info['direction'][0]), float(info['direction'][1]), 0.0],
+            'axis': info['axis'],
+            'sign': info['sign'],
+            'position': float(info['position']),
+            'center': [float(c) for c in info['center']],
+            'face_count': int(info['face_count'])
+        }
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        print(f"    ✅ Нормали стен сохранены: {path}")
+    except Exception as e:
+        print(f"    ❌ Ошибка записи нормалей в JSON: {e}")
+
+
+def create_highlight_material(name="WallFacesHighlight", color=(0.1, 0.9, 0.2, 1.0)):
+    if name in bpy.data.materials:
+        mat = bpy.data.materials[name]
+        # обновим цвет
+        mat.diffuse_color = color
+        if mat.use_nodes and 'Principled BSDF' in mat.node_tree.nodes:
+            mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = color
+        return mat
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    mat.diffuse_color = color
+    try:
+        mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = color
+    except Exception:
+        pass
+    return mat
+
+
+def visualize_wall_faces(src_obj, wall_number, collection_name="WALLS_DEBUG"):
+    """Создает отдельный объект только с гранями указанной стены (по wall_number)."""
+    # Дублируем объект и его меш
+    obj = src_obj.copy()
+    obj.data = src_obj.data.copy()
+    obj.name = f"Wall_Faces_{wall_number}"
+    bpy.context.scene.collection.objects.link(obj)
+
+    # Оставляем только нужные грани в дубликате
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(obj.data)
+    layer = bm.faces.layers.int.get("wall_number")
+    if layer is None:
+        bpy.ops.object.mode_set(mode='OBJECT')
+        print("    ⚠️  Визуализация: слой 'wall_number' не найден")
+        return None
+
+    # Выбираем все грани, КРОМЕ нужного номера — их удалим
+    for f in bm.faces:
+        f.select = (f[layer] != wall_number)
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.mesh.delete(type='FACE')
+
+    # Очистка
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.delete_loose()
+    bpy.ops.mesh.remove_doubles(threshold=0.001)
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Применяем яркий материал
+    hl = create_highlight_material()
+    obj.data.materials.clear()
+    obj.data.materials.append(hl)
+
+    # Перемещаем в debug-коллекцию
+    debug_coll = get_or_create_collection(collection_name)
+    # убрать из всех коллекций и добавить в debug
+    for coll in list(obj.users_collection):
+        coll.objects.unlink(obj)
+    debug_coll.objects.link(obj)
+
+    print(f"    ✅ Визуализация: создан объект {obj.name} в коллекции {collection_name}")
+    return obj
+
+
+def export_obj(objs, output_path):
+    """Экспортирует один объект или список объектов в OBJ."""
+    bpy.ops.object.select_all(action='DESELECT')
+
+    if isinstance(objs, list):
+        to_export = [o for o in objs if o is not None]
+        for o in to_export:
+            o.select_set(True)
+        if to_export:
+            bpy.context.view_layer.objects.active = to_export[0]
+    else:
+        objs.select_set(True)
+        bpy.context.view_layer.objects.active = objs
 
     try:
         bpy.ops.wm.obj_export(
             filepath=output_path,
             export_selected_objects=True,
-            export_materials=False,
+            export_materials=True,
             export_normals=True,
-            export_uv=False,
+            export_uv=True,
         )
     except AttributeError:
         bpy.ops.export_scene.obj(
             filepath=output_path,
             use_selection=True,
-            use_materials=False,
+            use_materials=True,
             use_normals=True,
-            use_uvs=False,
+            use_uvs=True,
         )
 
     if os.path.exists(output_path):
@@ -448,6 +875,31 @@ def main():
     merge_duplicate_vertices(wall_obj, MERGE_DISTANCE)
     recalc_normals(wall_obj)
 
+    # Идентификация стен + нумерация и метки (до создания проёмов и фундамента)
+    print("\n[WALLS] Идентификация, нумерация и метки (до проёмов)")
+    wall_info = identify_and_number_walls_from_mesh(
+        wall_obj,
+        position_tolerance=0.15,
+        normal_threshold=0.7,
+    )
+    print(f"    Найдено стен: {len(wall_info)}")
+    for wn, info in wall_info.items():
+        nx, ny = info['direction']
+        print(f"    Стена #{wn}: центр={info['center']}, нормаль=( {nx:.1f}, {ny:.1f}, 0.0 )")
+
+    red_mat = create_red_material()
+    labels = create_wall_number_labels(wall_info, red_mat, label_size=0.5)
+
+    # Сохраняем нормали стен в отдельный JSON
+    save_wall_normals_to_json(wall_info, OUTPUT_NORMALS_JSON)
+
+    # Визуализация граней конкретной стены (для отладки)
+    if isinstance(DEBUG_WALL_TO_VISUALIZE, int):
+        try:
+            visualize_wall_faces(wall_obj, DEBUG_WALL_TO_VISUALIZE, collection_name="WALLS_DEBUG")
+        except Exception as e:
+            print(f"    ⚠️  Не удалось визуализировать стену {DEBUG_WALL_TO_VISUALIZE}: {e}")
+
     outline_ids = {v["junction_id"] for v in vertices}
     openings = collect_outline_openings(data, outline_ids)
     print(f"    Проёмов на контуре: {len(openings)}")
@@ -464,9 +916,30 @@ def main():
     recalc_normals(wall_obj)
     cleanup_mesh(wall_obj)
 
+    # Создаем фундамент, если есть данные
+    foundation_obj = None
+    if 'foundation' in data:
+        print("\n[FOUNDATION] Создание фундамента из JSON")
+        foundation_obj = create_foundation(
+            data['foundation'],
+            z_offset=FOUNDATION_Z_OFFSET,
+            thickness=FOUNDATION_THICKNESS,
+            scale_factor=SCALE_FACTOR,
+        )
+
     print()
     print("[EXPORT] Экспорт OBJ")
-    export_obj(wall_obj, OUTPUT_OBJ)
+    objects_to_export = [wall_obj]
+    if EXPORT_LABELS_IN_OBJ:
+        # Конвертируем метки в mesh и добавим в экспорт
+        try:
+            label_meshes = convert_text_labels_to_mesh(labels)
+            objects_to_export.extend(label_meshes)
+        except Exception as e:
+            print(f"    ⚠️  Ошибка при подготовке меток к экспорту: {e}")
+    if foundation_obj is not None:
+        objects_to_export.append(foundation_obj)
+    export_obj(objects_to_export, OUTPUT_OBJ)
 
     print()
     print("=" * 70)
@@ -475,6 +948,10 @@ def main():
     print(f"Стена: {wall_obj.name}")
     print(f"Вершин: {len(wall_obj.data.vertices)}")
     print(f"Граней: {len(wall_obj.data.polygons)}")
+    if foundation_obj is not None:
+        print(f"Фундамент: {foundation_obj.name} ✅")
+    else:
+        print(f"Фундамент: отсутствует")
     
     # Проверяем результат
     if len(wall_obj.data.vertices) > 50:  # Должно быть достаточно вершин после вырезания
