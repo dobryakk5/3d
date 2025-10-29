@@ -1921,7 +1921,101 @@ def create_wall_mesh(segment_data, wall_height, wall_thickness, scale_factor=1.0
     
     return obj
 
-def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False, wall_obj=None, wall_bounds=None, neighbor_bounds=None):
+def find_nearby_window(door_opening, all_openings, scale_factor=1.0, wall_thickness=0.2):
+    """
+    Находит окно рядом с дверью (на расстоянии менее половины толщины стены)
+
+    Args:
+        door_opening: данные двери
+        all_openings: список всех проемов
+        scale_factor: масштабный коэффициент
+        wall_thickness: толщина стены в метрах
+
+    Returns:
+        dict или None: данные окна если найдено, иначе None
+    """
+    if door_opening.get("type") != "door":
+        return None
+
+    door_bbox = door_opening.get("bbox", {})
+    if not door_bbox:
+        return None
+
+    door_orientation = door_opening.get("orientation", "horizontal")
+    door_id = door_opening.get("id")
+
+    PROXIMITY_THRESHOLD = wall_thickness / 2.0  # Половина ширины стены
+
+    print(f"    Ищем окна рядом с дверью {door_id} (порог: {PROXIMITY_THRESHOLD*1000:.1f}мм)")
+
+    if door_orientation == "horizontal":
+        door_x = door_bbox["x"] * scale_factor
+        door_width = door_bbox["width"] * scale_factor
+        door_x_end = door_x + door_width
+        door_y = door_bbox["y"] * scale_factor
+
+        for opening in all_openings:
+            if opening.get("id") == door_id or opening.get("type") != "window":
+                continue
+
+            opening_bbox = opening.get("bbox", {})
+            opening_orientation = opening.get("orientation", "horizontal")
+
+            if opening_bbox and opening_orientation == "horizontal":
+                opening_y = opening_bbox["y"] * scale_factor
+
+                # Проверяем, что на той же линии
+                if abs(opening_y - door_y) < 0.05:
+                    opening_x = opening_bbox["x"] * scale_factor
+                    opening_width = opening_bbox["width"] * scale_factor
+                    opening_x_end = opening_x + opening_width
+
+                    # Проверяем близость (слева или справа)
+                    gap_left = abs(door_x - opening_x_end)
+                    gap_right = abs(opening_x - door_x_end)
+
+                    print(f"      Проверка окна {opening.get('id')}: gap_left={gap_left*1000:.1f}мм, gap_right={gap_right*1000:.1f}мм")
+
+                    if gap_left < PROXIMITY_THRESHOLD or gap_right < PROXIMITY_THRESHOLD:
+                        print(f"      ✓ Окно {opening.get('id')} найдено рядом с дверью {door_id}!")
+                        return opening
+
+    elif door_orientation == "vertical":
+        door_y = door_bbox["y"] * scale_factor
+        door_height = door_bbox["height"] * scale_factor
+        door_y_end = door_y + door_height
+        door_x = door_bbox["x"] * scale_factor
+
+        for opening in all_openings:
+            if opening.get("id") == door_id or opening.get("type") != "window":
+                continue
+
+            opening_bbox = opening.get("bbox", {})
+            opening_orientation = opening.get("orientation", "horizontal")
+
+            if opening_bbox and opening_orientation == "vertical":
+                opening_x = opening_bbox["x"] * scale_factor
+
+                # Проверяем, что на той же линии
+                if abs(opening_x - door_x) < 0.05:
+                    opening_y = opening_bbox["y"] * scale_factor
+                    opening_height = opening_bbox["height"] * scale_factor
+                    opening_y_end = opening_y + opening_height
+
+                    # Проверяем близость (сверху или снизу)
+                    gap_bottom = abs(door_y - opening_y_end)
+                    gap_top = abs(opening_y - door_y_end)
+
+                    print(f"      Проверка окна {opening.get('id')}: gap_bottom={gap_bottom*1000:.1f}мм, gap_top={gap_top*1000:.1f}мм")
+
+                    if gap_bottom < PROXIMITY_THRESHOLD or gap_top < PROXIMITY_THRESHOLD:
+                        print(f"      ✓ Окно {opening.get('id')} найдено рядом с дверью {door_id}!")
+                        return opening
+
+    print(f"    ✗ Окна рядом с дверью {door_id} не найдены")
+    return None
+
+def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=1.0, is_external=False, wall_obj=None, wall_bounds=None, neighbor_bounds=None, nearby_window_info=None):
     """
     Создает 3D меш для проема (окна или двери) используя точные координаты из JSON
     без расширения за счет толщины стен, чтобы проемы были вертикальными без углублений
@@ -1946,15 +2040,30 @@ def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=
     if "bottom_height" in opening_data and "opening_height" in opening_data:
         opening_bottom = opening_data["bottom_height"]
         opening_height = opening_data["opening_height"]
+
+        # Если дверь рядом с окном, поднимаем верх двери до верха окна
+        if opening_data["type"] == "door" and nearby_window_info:
+            if "bottom_height" in nearby_window_info and "opening_height" in nearby_window_info:
+                # Низ двери остается как есть, верх поднимаем до верха окна
+                window_top = nearby_window_info["bottom_height"] + nearby_window_info["opening_height"]
+                opening_height = window_top - opening_bottom
+                print(f"    Дверь {opening_data.get('id')} рядом с окном - поднимаем верх до уровня окна: высота={opening_height:.2f}м, низ={opening_bottom:.2f}м")
     else:
         # Резервный вариант с вычисляемыми пропорциями
         # Определяем параметры проема
         if opening_data["type"] == "door":
-            opening_height = 2.0  # Фиксированная высота двери - 2 метра
-            opening_bottom = 0.1  # Небольшой зазор снизу
+            if nearby_window_info:
+                # Низ двери стандартный, верх поднимаем до верха окна
+                opening_bottom = 0.1  # Небольшой зазор снизу (стандарт для двери)
+                window_top = 0.65 + wall_height * 0.6  # Окно на 65см + 60% высоты стены
+                opening_height = window_top - opening_bottom
+                print(f"    Дверь {opening_data.get('id')} рядом с окном - используем пропорции окна: высота={opening_height:.2f}м")
+            else:
+                opening_height = 2.0  # Фиксированная высота двери - 2 метра
+                opening_bottom = 0.1  # Небольшой зазор снизу
         else:  # window
             opening_height = wall_height * 0.6  # Высота окна - 60% от высоты стены
-            opening_bottom = wall_height * 0.3  # Высота от пола до низа окна - 30% от высоты стены
+            opening_bottom = 0.65  # Окна на высоте 65 см от пола
 
     # Используем wall_bounds если передан, иначе получаем из wall_obj
     wall_x_min = None
@@ -2118,7 +2227,15 @@ def create_opening_mesh(opening_data, wall_height, wall_thickness, scale_factor=
     
     # Применяем материал в зависимости от типа проема и расположения
     if opening_data["type"] == "door":
-        if is_external:
+        if nearby_window_info:
+            # Голубой материал для дверей рядом с окнами (как у окон)
+            if is_external:
+                mat = bpy.data.materials.new(name="DoorNearWindowMaterial")
+                mat.diffuse_color = (0.3, 0.5, 0.8, 1.0)  # Тёмно-голубой (как внешнее окно)
+            else:
+                mat = bpy.data.materials.new(name="DoorNearWindowMaterial")
+                mat.diffuse_color = (0.5, 0.7, 1.0, 1.0)  # Голубой (как внутреннее окно)
+        elif is_external:
             # Тёмно-зелёный материал для внешних дверей
             mat = bpy.data.materials.new(name="ExternalDoorMaterial")
             mat.diffuse_color = (0.0, 0.6, 0.0, 1.0)  # Тёмно-зелёный
@@ -2202,7 +2319,7 @@ def create_pillar_mesh(pillar_data, wall_height, wall_thickness, scale_factor=1.
     
     return obj
 
-def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_factor=1.0, wall_obj=None, external_side_info=None, wall_bounds=None, neighbor_bounds=None):
+def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_factor=1.0, wall_obj=None, external_side_info=None, wall_bounds=None, neighbor_bounds=None, nearby_window_info=None):
     """
     Создает 3D-заполнение для проема (окна/двери) - над и под проемом на всю ширину проема
 
@@ -2232,19 +2349,37 @@ def create_fill_for_opening(opening_data, wall_height, wall_thickness, scale_fac
     if "bottom_height" in opening_data and "opening_height" in opening_data:
         opening_bottom = opening_data["bottom_height"]
         opening_height = opening_data["opening_height"]
-        print(f"    Параметры из JSON: высота={opening_height:.2f}м, низ={opening_bottom:.2f}м")
+
+        # Если дверь рядом с окном, поднимаем верх двери до верха окна
+        if opening_data["type"] == "door" and nearby_window_info:
+            if "bottom_height" in nearby_window_info and "opening_height" in nearby_window_info:
+                # Низ двери остается как есть, верх поднимаем до верха окна
+                window_top = nearby_window_info["bottom_height"] + nearby_window_info["opening_height"]
+                opening_height = window_top - opening_bottom
+                print(f"    Заполнение для двери {opening_id} рядом с окном - поднимаем верх до уровня окна: высота={opening_height:.2f}м, низ={opening_bottom:.2f}м")
+            else:
+                print(f"    Параметры из JSON: высота={opening_height:.2f}м, низ={opening_bottom:.2f}м")
+        else:
+            print(f"    Параметры из JSON: высота={opening_height:.2f}м, низ={opening_bottom:.2f}м")
     else:
         # Резервный вариант с вычисляемыми пропорциями
         print(f"    Предупреждение: отсутствуют параметры в JSON для проема {opening_id}, используем стандартные значения")
-        
+
         # Определяем параметры проема в зависимости от типа
         if opening_data["type"] == "door":
-            opening_height = 2.0  # Фиксированная высота двери - 2 метра
-            opening_bottom = 0.1  # Небольшой зазор снизу
+            if nearby_window_info:
+                # Низ двери стандартный, верх поднимаем до верха окна
+                opening_bottom = 0.1  # Небольшой зазор снизу (стандарт для двери)
+                window_top = 0.65 + wall_height * 0.6  # Окно на 65см + 60% высоты стены
+                opening_height = window_top - opening_bottom
+                print(f"    Заполнение для двери: используем пропорции окна, высота={opening_height:.2f}м")
+            else:
+                opening_height = 2.0  # Фиксированная высота двери - 2 метра
+                opening_bottom = 0.1  # Небольшой зазор снизу
             print(f"    Параметры двери: высота={opening_height}м, низ={opening_bottom}м")
         else:  # window
             opening_height = wall_height * 0.6  # Высота окна - 60% от высоты стены
-            opening_bottom = wall_height * 0.3  # Высота от пола до низа окна - 30% от высоты стены
+            opening_bottom = 0.65  # Окна на высоте 65 см от пола
             print(f"    Параметры окна: высота={opening_height:.2f}м, низ={opening_bottom:.2f}м")
     
     # Получаем координаты с применением масштабирования
@@ -2698,7 +2833,7 @@ def create_fill_walls_between_openings(wall_segments, openings, wall_thickness, 
         if wall_objects:
             # Находим все стены, которые пересекаются с проемом
             # Создаем временный объект проема для проверки пересечения
-            temp_opening = create_opening_mesh(opening, wall_height, wall_thickness, scale_factor)
+            temp_opening = create_opening_mesh(opening, wall_height, wall_thickness, scale_factor, nearby_window_info=None)
             if temp_opening:
                 for wall_obj in wall_objects:
                     if check_wall_opening_intersection(wall_obj, temp_opening):
@@ -2862,7 +2997,14 @@ def create_fill_walls_between_openings(wall_segments, openings, wall_thickness, 
                         external_side_info = external_side_info_dict[segment_id]
                         print(f"  Найдена информация об уличной стороне для сегмента {segment_id}")
                     break
-        
+
+        # Для дверей проверяем, есть ли рядом окна
+        nearby_window = None
+        if opening_type == "door":
+            nearby_window = find_nearby_window(opening, openings, scale_factor, wall_thickness)
+            if nearby_window:
+                print(f"  Обнаружено окно {nearby_window.get('id')} рядом с дверью {opening_id} (для заполнения)")
+
         fill_objects = create_fill_for_opening(
             opening_copy,
             wall_height,
@@ -2871,7 +3013,8 @@ def create_fill_walls_between_openings(wall_segments, openings, wall_thickness, 
             related_wall,
             external_side_info,
             wall_bounds,
-            neighbor_bounds
+            neighbor_bounds,
+            nearby_window
         )
         
         if fill_objects:
@@ -3672,7 +3815,14 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
                         'top': top_neighbor_y
                     }
 
-            opening_obj = create_opening_mesh(opening, wall_height_meters, wall_thickness, scale_factor, is_external=is_ext, wall_obj=related_wall, wall_bounds=wall_bounds, neighbor_bounds=neighbor_bounds)
+            # Для дверей проверяем, есть ли рядом окна
+            nearby_window = None
+            if opening.get("type") == "door":
+                nearby_window = find_nearby_window(opening, openings, scale_factor, wall_thickness)
+                if nearby_window:
+                    print(f"  Обнаружено окно {nearby_window.get('id')} рядом с дверью {opening_id}")
+
+            opening_obj = create_opening_mesh(opening, wall_height_meters, wall_thickness, scale_factor, is_external=is_ext, wall_obj=related_wall, wall_bounds=wall_bounds, neighbor_bounds=neighbor_bounds, nearby_window_info=nearby_window)
             if opening_obj:
                 opening_objects.append(opening_obj)
                 if is_ext:

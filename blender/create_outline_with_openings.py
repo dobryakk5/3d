@@ -1,18 +1,7 @@
 #!/usr/bin/env python3
 """
 Создаёт цельный контур внешних стен с отверстиями окон и дверей.
-
-Базируется на логике create_precise_outline_copy.py:
-1. Формирует прямоугольные сегменты контура из JSON, объединяет их в один меш.
-2. Экструдирует стены на высоту здания.
-3. Создаёт вырезы для окон/дверей, при этом первые два окна обрабатываются разными методами:
-   - первое окно (boolean-модификатор),
-   - второе окно (bmesh.boolean),
-   остальные — стандартным boolean после объединения.
-Одновременно создаются wireframe-очертания проёмов для визуальной проверки расположения.
-
-Запуск:
-    blender --background --python create_outline_with_openings.py
+Надежная версия с булевыми операциями.
 """
 
 import bpy
@@ -26,7 +15,8 @@ SCALE_FACTOR = 0.01        # 1 px = 1 см
 WALL_THICKNESS_PX = 22.0   # толщина стены в пикселях
 WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
-CUT_MARGIN = 0.05          # дополнительный запас для булевых вырезов
+CUT_MARGIN = 0.05          # запас для гарантии пересечения
+OPENING_WIDTH_MULTIPLIER = 1.95  # масштаб ширины проёмов
 
 WINDOW_BOTTOM = 0.65
 WINDOW_TOP = 2.45
@@ -45,7 +35,6 @@ def clear_scene():
     bpy.ops.object.select_all(action='SELECT')
     if bpy.context.selected_objects:
         bpy.ops.object.delete()
-    # удаляем пустые коллекции (кроме master)
     for coll in list(bpy.context.scene.collection.children):
         bpy.context.scene.collection.children.unlink(coll)
 
@@ -288,56 +277,7 @@ def opening_bounds(opening):
     return WINDOW_BOTTOM, WINDOW_TOP
 
 
-def create_debug_outline(opening, dims, collection, color=(1.0, 0.2, 0.2, 1.0)):
-    opening_id = opening.get("id", "unknown")
-    bottom, top = dims["bottom"], dims["top"]
-    width = dims["wire_width"]
-    depth = dims["wire_depth"]
-    x_center = dims["x_center"]
-    y_center = dims["y_center"]
-    orientation = dims["orientation"]
-
-    if orientation == "horizontal":
-        verts = [
-            (x_center - width / 2.0, y_center + depth / 2.0 + 0.005, bottom),
-            (x_center + width / 2.0, y_center + depth / 2.0 + 0.005, bottom),
-            (x_center + width / 2.0, y_center + depth / 2.0 + 0.005, top),
-            (x_center - width / 2.0, y_center + depth / 2.0 + 0.005, top),
-        ]
-    else:
-        verts = [
-            (x_center + width / 2.0 + 0.005, y_center - depth / 2.0, bottom),
-            (x_center + width / 2.0 + 0.005, y_center + depth / 2.0, bottom),
-            (x_center + width / 2.0 + 0.005, y_center + depth / 2.0, top),
-            (x_center + width / 2.0 + 0.005, y_center - depth / 2.0, top),
-        ]
-
-    mesh = bpy.data.meshes.new(f"Opening_Debug_Mesh_{opening_id}")
-    mesh.from_pydata(verts, [], [(0, 1, 2, 3)])
-    mesh.update()
-
-    obj = bpy.data.objects.new(f"Opening_Debug_{opening_id}", mesh)
-    obj.display_type = 'WIRE'
-    obj.show_in_front = True
-    obj.hide_render = True
-
-    collection.objects.link(obj)
-
-    mat_name = "OpeningDebugMaterial"
-    if mat_name in bpy.data.materials:
-        mat = bpy.data.materials[mat_name]
-    else:
-        mat = bpy.data.materials.new(mat_name)
-        mat.diffuse_color = color
-    if not obj.data.materials:
-        obj.data.materials.append(mat)
-    else:
-        obj.data.materials[0] = mat
-
-    return obj
-
-
-def create_opening_entries(openings, opening_heights):
+def create_opening_cutters(openings, opening_heights):
     entries = []
     debug_collection = get_or_create_collection("OPENINGS_DEBUG")
 
@@ -347,151 +287,109 @@ def create_opening_entries(openings, opening_heights):
             continue
 
         orientation = opening.get("orientation", "horizontal")
+        
+        # Для гарантии пересечения делаем вырезатели больше
+        if orientation == "vertical":
+            # Вертикальные проемы - глубина задаёт ширину отверстия вдоль стены
+            width = WALL_THICKNESS_PX * SCALE_FACTOR * 3.0  # Толщина стены с запасом
+            depth = bbox["height"] * SCALE_FACTOR * OPENING_WIDTH_MULTIPLIER
+        else:
+            # Горизонтальные проемы - используем ширину проема
+            width = bbox["width"] * SCALE_FACTOR * OPENING_WIDTH_MULTIPLIER
+            depth = WALL_THICKNESS_PX * SCALE_FACTOR * 3.0  # Толщина стены с запасом
+
+
         x_center = (bbox["x"] + bbox["width"] / 2.0) * SCALE_FACTOR
         y_center = (bbox["y"] + bbox["height"] / 2.0) * SCALE_FACTOR
 
-        wall_thickness_m = WALL_THICKNESS_PX * SCALE_FACTOR
-        if orientation == "vertical":
-            base_width = wall_thickness_m
-            base_depth = max(bbox["height"] * SCALE_FACTOR, wall_thickness_m)
-            size_x = wall_thickness_m * 2.0
-            size_y = max(bbox["height"] * SCALE_FACTOR * 1.5, wall_thickness_m * 2.0)
-        else:
-            base_width = max(bbox["width"] * SCALE_FACTOR, wall_thickness_m)
-            base_depth = wall_thickness_m
-            size_x = max(bbox["width"] * SCALE_FACTOR * 1.5, wall_thickness_m * 2.0)
-            size_y = wall_thickness_m * 2.0
-
+        # Получаем высоты проема
         bottom_top = opening_heights.get(opening["id"]) if opening_heights else None
         if bottom_top:
             bottom, top = bottom_top
+            # Добавляем запас по высоте
+            height = (top - bottom) * 2  # +20% к высоте
+            z_center = (bottom + top) / 2.0
         else:
             bottom, top = opening_bounds(opening)
+            height = (top - bottom) * 1.2  # +20% к высоте
+            z_center = (bottom + top) / 2.0
 
-        height = max(top - bottom, 0.1)
-        z_center = bottom + height / 2.0
+        print(f"    Проем '{opening.get('id', 'unknown')}':")
+        print(f"      Ориентация: {orientation}")
+        print(f"      Размеры вырезателя: {width:.3f} x {depth:.3f} x {height:.3f}")
+        print(f"      Позиция: ({x_center:.3f}, {y_center:.3f}, {z_center:.3f})")
 
-        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x_center, y_center, z_center))
-        cutter = bpy.context.active_object
-        cutter.name = f"Opening_{opening.get('id', 'unknown')}"
-
-        cutter.scale.x = base_width #size_x / 2.0 + CUT_MARGIN * 2
-        cutter.scale.y = base_depth #size_y / 2.0 + CUT_MARGIN * 2
-        cutter.scale.z = height / 2.0 + CUT_MARGIN
-
-        actual_width = cutter.scale.x * 2.0
-        actual_depth = cutter.scale.y * 2.0
-        actual_height = cutter.scale.z * 2.0
-
-        debug_mesh = bpy.data.meshes.new(f"{cutter.name}_WireMesh")
-        debug_mesh.from_pydata(
-            [
-                (x_center - base_width / 2.0, y_center - base_depth / 2.0, bottom),
-                (x_center + base_width / 2.0, y_center - base_depth / 2.0, bottom),
-                (x_center + base_width / 2.0, y_center + base_depth / 2.0, bottom),
-                (x_center - base_width / 2.0, y_center + base_depth / 2.0, bottom),
-                (x_center - base_width / 2.0, y_center - base_depth / 2.0, top),
-                (x_center + base_width / 2.0, y_center - base_depth / 2.0, top),
-                (x_center + base_width / 2.0, y_center + base_depth / 2.0, top),
-                (x_center - base_width / 2.0, y_center + base_depth / 2.0, top),
-            ],
-            [
-                (0, 1), (1, 2), (2, 3), (3, 0),
-                (4, 5), (5, 6), (6, 7), (7, 4),
-                (0, 4), (1, 5), (2, 6), (3, 7),
-            ],
-            []
-        )
-        debug_mesh.update()
-
-        debug_copy = bpy.data.objects.new(f"{cutter.name}_Wire", debug_mesh)
-        debug_copy.display_type = 'WIRE'
-        debug_copy.show_in_front = True
-        debug_copy.hide_render = True
-        debug_collection.objects.link(debug_copy)
-
-        dims = {
-            "wire_width": base_width,
-            "wire_depth": base_depth,
-            "x_center": x_center,
-            "y_center": y_center,
-            "bottom": bottom,
-            "top": top,
-            "orientation": orientation,
-            "bbox": bbox,
-            "cutter_width": actual_width,
-            "cutter_depth": actual_depth,
-            "cutter_height": actual_height,
-        }
-
-        outline_obj = create_debug_outline(opening, dims, debug_collection)
+        # СОЗДАЕМ ВЫРЕЗАТЕЛЬ КАК ОБЪЕКТ-КУБ
+        bpy.ops.mesh.primitive_cube_add(size=1.0)
+        cutter_obj = bpy.context.active_object
+        cutter_obj.name = f"Opening_Cutter_{opening.get('id', 'unknown')}"
+        cutter_obj.location = (x_center, y_center, z_center)
+        cutter_obj.scale = (width/2, depth/2, height/2)
+        
+        # Перемещаем в коллекцию отладки
+        debug_collection.objects.link(cutter_obj)
+        bpy.context.scene.collection.objects.unlink(cutter_obj)
 
         entries.append({
             "opening": opening,
-            "cutter": cutter,
-            "debug_mesh": outline_obj,
-            "wire_cutter": debug_copy,
-            "dims": dims,
+            "cutter": cutter_obj,
         })
 
-    print(f"    Подготовлено проёмов: {len(entries)}")
+    print(f"    Создано вырезателей: {len(entries)}")
     return entries
 
 
-def apply_boolean_modifier(target_obj, cutter_obj, name_suffix, solver='EXACT'):
-    bpy.ops.object.select_all(action='DESELECT')
-    target_obj.select_set(True)
-    bpy.context.view_layer.objects.active = target_obj
-
-    mod = target_obj.modifiers.new(name=f"Opening_{name_suffix}", type='BOOLEAN')
-    mod.operation = 'DIFFERENCE'
-    mod.solver = solver
-    mod.object = cutter_obj
-
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    bpy.data.objects.remove(cutter_obj, do_unlink=True)
-
-
-def apply_boolean_batch(target_obj, cutter_objects, solver='EXACT'):
-    if not cutter_objects:
-        return
-
-    bpy.ops.object.select_all(action='DESELECT')
-    for cutter in cutter_objects:
-        cutter.select_set(True)
-
-    bpy.context.view_layer.objects.active = cutter_objects[0]
-    bpy.ops.object.join()
-    combined = bpy.context.active_object
-    combined.name = "Openings_Cutter_Batch"
-
-    apply_boolean_modifier(target_obj, combined, "Batch", solver=solver)
-
-
-def apply_openings(wall_obj, entries):
+def apply_boolean_operations(wall_obj, entries):
+    """Применяем булевы операции через модификаторы"""
     if not entries:
         print("    Проёмов нет — булевы операции пропущены.")
         return
 
-    print("    Окна/двери:")
+    print("    Применение булевых операций...")
+    
+    # Убедимся, что стена имеет хорошую геометрию
+    bpy.context.view_layer.objects.active = wall_obj
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
 
-    first = entries[0]
-    print(f"      • {first['opening']['id']} → Boolean (solver=EXACT)")
-    apply_boolean_modifier(wall_obj, first["cutter"], first["opening"]["id"], solver='EXACT')
+    successful_cuts = 0
+    
+    for i, entry in enumerate(entries):
+        cutter = entry["cutter"]
+        print(f"      Вырез {i+1}/{len(entries)}: {cutter.name}")
+        
+        # Активируем стену
+        bpy.context.view_layer.objects.active = wall_obj
+        wall_obj.select_set(True)
+        
+        # Добавляем модификатор Boolean
+        mod = wall_obj.modifiers.new(name=f"Opening_{i}", type='BOOLEAN')
+        mod.operation = 'DIFFERENCE'
+        mod.solver = 'EXACT'  # Используем EXACT solver для надежности
+        mod.object = cutter
 
-    remaining_cutters = []
+        # Пытаемся применить модификатор
+        try:
+            # Сначала показываем модификатор в режиме просмотра
+            mod.show_viewport = True
+            mod.show_render = True
+            
+            # Затем применяем
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+            successful_cuts += 1
+            print(f"        ✅ Булева операция успешна")
+            
+        except Exception as e:
+            print(f"        ❌ Ошибка булевой операции: {e}")
+            # Удаляем проблемный модификатор
+            wall_obj.modifiers.remove(mod)
 
-    if len(entries) > 1:
-        second = entries[1]
-        print(f"      • {second['opening']['id']} → Boolean (solver=FAST)")
-        apply_boolean_modifier(wall_obj, second["cutter"], second["opening"]["id"], solver='FAST')
+        # Удаляем вырезатель
+        bpy.data.objects.remove(cutter, do_unlink=True)
 
-    for entry in entries[2:]:
-        remaining_cutters.append(entry["cutter"])
-
-    if remaining_cutters:
-        print(f"      • Остальные ({len(remaining_cutters)}) → Batch boolean (solver=EXACT)")
-        apply_boolean_batch(wall_obj, remaining_cutters, solver='EXACT')
+    print(f"    Успешно применено {successful_cuts} из {len(entries)} булевых операций")
 
 
 def cleanup_mesh(obj):
@@ -499,6 +397,8 @@ def cleanup_mesh(obj):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.delete_loose()
+    bpy.ops.mesh.remove_doubles(threshold=0.001)
+    bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
@@ -533,7 +433,7 @@ def export_obj(obj, output_path):
 
 def main():
     print("=" * 70)
-    print("СОЗДАНИЕ КОНТУРА С ПРОЁМАМИ")
+    print("СОЗДАНИЕ КОНТУРА С ПРОЁМАМИ - НАДЕЖНАЯ ВЕРСИЯ")
     print("=" * 70)
     print(f"JSON: {JSON_PATH}")
     print()
@@ -554,10 +454,13 @@ def main():
 
     opening_heights = load_opening_heights_from_obj(OBJ_HEIGHT_SOURCE_PATH)
 
-    opening_entries = create_opening_entries(openings, opening_heights)
-    apply_openings(wall_obj, opening_entries)
+    opening_entries = create_opening_cutters(openings, opening_heights)
+    
+    # Применяем булевы операции
+    apply_boolean_operations(wall_obj, opening_entries)
 
-    merge_duplicate_vertices(wall_obj, 1e-5)
+    # Финальная очистка
+    merge_duplicate_vertices(wall_obj, 0.001)
     recalc_normals(wall_obj)
     cleanup_mesh(wall_obj)
 
@@ -572,6 +475,12 @@ def main():
     print(f"Стена: {wall_obj.name}")
     print(f"Вершин: {len(wall_obj.data.vertices)}")
     print(f"Граней: {len(wall_obj.data.polygons)}")
+    
+    # Проверяем результат
+    if len(wall_obj.data.vertices) > 50:  # Должно быть достаточно вершин после вырезания
+        print("✅ Проемы должны быть видны в стенах")
+    else:
+        print("❌ Возможно, проемы не создались - проверьте позиции вырезателей")
 
 
 if __name__ == "__main__":

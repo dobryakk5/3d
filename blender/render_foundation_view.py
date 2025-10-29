@@ -19,7 +19,7 @@ for obj in list(bpy.data.lights):
 
 # Путь к OBJ файлу
 script_dir = os.path.dirname(os.path.abspath(__file__))
-obj_path = os.path.join(script_dir, "complete_outline_VOXEL_REMESH_FINE.obj")
+obj_path = os.path.join(script_dir, "precise_building_outline_with_openings_fixed.obj")
 
 print(f"\n{'='*60}")
 print(f"РЕНДЕР ЗДАНИЯ С ФУНДАМЕНТОМ")
@@ -78,7 +78,7 @@ light_obj.location = (10, -10, 20)
 light_obj.rotation_euler = (math.radians(45), 0, math.radians(30))
 
 # Настройки рендера
-bpy.context.scene.render.engine = 'BLENDER_EEVEE'
+bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
 bpy.context.scene.render.resolution_x = 1920
 bpy.context.scene.render.resolution_y = 1080
 bpy.context.scene.render.image_settings.file_format = 'PNG'
