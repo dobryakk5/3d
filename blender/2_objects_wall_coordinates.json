@@ -2,7 +2,7 @@
   "metadata": {
     "source_file": "2_objects.json",
     "wall_thickness": 21.0,
-    "timestamp": "2025-10-30T13:43:02.216817",
+    "timestamp": "2025-10-30T17:33:28.474484",
     "version": "1.0"
   },
   "junctions": [
@@ -319,6 +319,11 @@
         {
           "segment_id": "wall_junction_18_to_13_right",
           "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_1_bottom_42_to_13",
+          "segment_type": "from_openings",
           "connection_type": "end"
         },
         {
@@ -897,7 +902,7 @@
       "confidence": 1.0,
       "connected_wall_segments": [
         {
-          "segment_id": "wall_door_1_bottom_42_to_43",
+          "segment_id": "wall_door_1_bottom_42_to_13",
           "segment_type": "from_openings",
           "connection_type": "start"
         }
@@ -911,13 +916,7 @@
       "detected_type": "unknown",
       "directions": [],
       "confidence": 1.0,
-      "connected_wall_segments": [
-        {
-          "segment_id": "wall_door_1_bottom_42_to_43",
-          "segment_type": "from_openings",
-          "connection_type": "end"
-        }
-      ]
+      "connected_wall_segments": []
     },
     {
       "id": 44,
@@ -1466,15 +1465,15 @@
       "orientation": "vertical",
       "bbox": {
         "x": 1180.0,
-        "y": 509.0,
+        "y": 511.0,
         "width": 21.0,
-        "height": 46.0,
+        "height": 44.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_6",
           "original_coords": {
             "x": 1180.0,
-            "y": 509.0
+            "y": 511.0
           },
           "alignment_type": "opening"
         }
@@ -1492,7 +1491,7 @@
         "x": 1180.0,
         "y": 616.0,
         "width": 21.0,
-        "height": 35.0,
+        "height": 34.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_6",
@@ -1514,15 +1513,15 @@
       "orientation": "vertical",
       "bbox": {
         "x": 1180.0,
-        "y": 415.0,
+        "y": 416.0,
         "width": 21.0,
-        "height": 31.0,
+        "height": 30.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_6",
           "original_coords": {
             "x": 1180.0,
-            "y": 415.0
+            "y": 416.0
           },
           "alignment_type": "opening"
         }
@@ -1540,7 +1539,7 @@
         "x": 1180.0,
         "y": 509.0,
         "width": 21.0,
-        "height": 46.0,
+        "height": 45.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_6",
@@ -1578,23 +1577,23 @@
       "alignment_info": {}
     },
     {
-      "segment_id": "wall_door_1_bottom_42_to_43",
+      "segment_id": "wall_door_1_bottom_42_to_13",
       "opening_id": "door_1",
       "edge_side": "bottom",
       "start_junction_id": 42,
-      "end_junction_id": 43,
+      "end_junction_id": 13,
       "orientation": "vertical",
       "bbox": {
         "x": 709.5,
-        "y": 435.0,
+        "y": 438.8,
         "width": 21.0,
-        "height": 0.0,
+        "height": 19.19999999999999,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "door_4",
           "original_coords": {
             "x": 709.5,
-            "y": 435.0
+            "y": 438.8
           },
           "alignment_type": "opening"
         }
@@ -1706,15 +1705,15 @@
       "orientation": "vertical",
       "bbox": {
         "x": 316.0,
-        "y": 458.0,
+        "y": 457.0,
         "width": 21.0,
-        "height": 28.0,
+        "height": 29.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_8",
           "original_coords": {
             "x": 316.0,
-            "y": 458.0
+            "y": 457.0
           },
           "alignment_type": "opening"
         }
@@ -1732,7 +1731,7 @@
         "x": 316.0,
         "y": 549.0,
         "width": 21.0,
-        "height": 99.0,
+        "height": 98.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_8",
@@ -1779,7 +1778,7 @@
       "bbox": {
         "x": 927.0,
         "y": 318.0,
-        "width": 20.0,
+        "width": 30.5,
         "height": 21.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -1899,15 +1898,15 @@
       "orientation": "vertical",
       "bbox": {
         "x": 709.5,
-        "y": 671.5,
+        "y": 649.0,
         "width": 21.0,
-        "height": 51.5,
+        "height": 74.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "door_4",
           "original_coords": {
             "x": 710.5,
-            "y": 671.5
+            "y": 649.0
           },
           "alignment_type": "opening"
         }
@@ -2348,7 +2347,7 @@
       "id": "window_3",
       "type": "window",
       "bbox": {
-        "x": 398.0,
+        "x": 397.0,
         "y": 58.5,
         "width": 155.0,
         "height": 21.0
@@ -2371,7 +2370,7 @@
       "bbox": {
         "x": 387.0,
         "y": 884.5,
-        "width": 92.0,
+        "width": 93.0,
         "height": 21.0
       },
       "orientation": "horizontal",
@@ -2390,9 +2389,9 @@
       "id": "window_5",
       "type": "window",
       "bbox": {
-        "x": 754.0,
+        "x": 753.0,
         "y": 884.5,
-        "width": 92.0,
+        "width": 94.0,
         "height": 21.0
       },
       "orientation": "horizontal",
@@ -2412,9 +2411,9 @@
       "type": "window",
       "bbox": {
         "x": 1180.0,
-        "y": 555.0,
+        "y": 553.0,
         "width": 21.0,
-        "height": 61.0
+        "height": 64.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -2433,9 +2432,9 @@
       "type": "window",
       "bbox": {
         "x": 1180.0,
-        "y": 446.0,
+        "y": 445.0,
         "width": 21.0,
-        "height": 63.0
+        "height": 65.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -2497,7 +2496,7 @@
       "bbox": {
         "x": 931.0,
         "y": 1000.5,
-        "width": 225.0,
+        "width": 227.0,
         "height": 21.0
       },
       "orientation": "horizontal",
@@ -2517,7 +2516,7 @@
       "type": "window",
       "bbox": {
         "x": 316.0,
-        "y": 486.0,
+        "y": 487.0,
         "width": 21.0,
         "height": 63.0
       },
@@ -2537,9 +2536,9 @@
       "id": "door_2",
       "type": "door",
       "bbox": {
-        "x": 848.0,
+        "x": 847.0,
         "y": 318.0,
-        "width": 79.0,
+        "width": 80.0,
         "height": 21.0
       },
       "orientation": "horizontal",
@@ -2604,7 +2603,7 @@
     "total_wall_segments_from_junctions": 40,
     "total_openings": 13,
     "total_pillar_squares": 0,
-    "extended_segments": 11,
+    "extended_segments": 13,
     "has_building_outline": true,
     "has_foundation": true,
     "has_street": true

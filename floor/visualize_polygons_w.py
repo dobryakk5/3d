@@ -2435,12 +2435,6 @@ def extend_segment_to_polygon_edge(segment: Union[WallSegmentFromOpening, WallSe
         
         if segment.orientation == 'horizontal':
             if extend_direction == 'left':
-                # ИСПРАВЛЕНИЕ: Проверяем, является ли стена стеной от проема
-                if hasattr(segment, 'opening_id'):
-                    # Для стен от проемов не расширяем влево за начальную junction
-                    print(f"    ✗ Сегмент {segment.segment_id} является стеной от проема, не расширяем влево")
-                    return False
-                
                 # Extend to the left
                 new_x = intersections[extend_direction]
                 new_width = segment.bbox['x'] + segment.bbox['width'] - new_x
@@ -2484,7 +2478,8 @@ def extend_segment_to_polygon_edge(segment: Union[WallSegmentFromOpening, WallSe
 
 def extend_segment_to_perpendicular_x(segment: Union[WallSegmentFromOpening, WallSegmentFromJunction],
                                      perpendicular_segment: Union[WallSegmentFromOpening, WallSegmentFromJunction],
-                                     l_junction: JunctionPoint) -> bool:
+                                     l_junction: JunctionPoint,
+                                     overshoot: float = 0.0) -> bool:
     """
     Измененная функция: расширяет оригинальный сегмент стены до координаты перпендикулярного сегмента
     
@@ -2504,56 +2499,72 @@ def extend_segment_to_perpendicular_x(segment: Union[WallSegmentFromOpening, Wal
     
     # Сохраняем оригинальные границы для отладки
     original_bbox = segment.bbox.copy()
-    
-    # Determine which segment is horizontal and which is vertical
+
+    # Выбор целевой стороны bbox перпендикулярной стены по направлению от узла
+    def target_x_by_direction(direction: str, rect: Dict[str, float]) -> float:
+        left = rect['x']
+        right = rect['x'] + rect['width']
+        return left if direction == 'left' else right
+
+    def target_y_by_direction(direction: str, rect: Dict[str, float]) -> float:
+        top = rect['y']
+        bottom = rect['y'] + rect['height']
+        return top if direction == 'up' else bottom
+
+    # Выбираем цель в зависимости от ориентаций (тянем до дальней стороны bbox)
     if segment.orientation == 'horizontal' and perpendicular_segment.orientation == 'vertical':
-        # Extend horizontal segment to reach vertical segment's X
-        target_x = perpendicular_segment.bbox['x']
-        
-        # Determine if we need to extend left or right
-        if target_x < segment.bbox['x']:
-            # Extend to the left
-            new_x = target_x
-            new_width = segment.bbox['x'] + segment.bbox['width'] - target_x
+        seg_left = segment.bbox['x']
+        seg_right = segment.bbox['x'] + segment.bbox['width']
+        # Направление: если узел ближе к правой грани сегмента — тянем вправо, иначе влево
+        direction = 'right' if abs(l_junction.x - seg_right) <= abs(l_junction.x - seg_left) else 'left'
+        target = target_x_by_direction(direction, perpendicular_segment.bbox)
+
+        if direction == 'left' and target < seg_left - 1e-6:
+            new_x = target - overshoot
             segment.bbox['x'] = new_x
+            segment.bbox['width'] = seg_right - new_x
+            print(f"    ✓ Сегмент {segment.segment_id} расширен влево до {target} (bbox перпендикуляра)")
+            if l_junction.id == 10:
+                print(f"    DEBUG J10: bbox changed from {original_bbox} to {segment.bbox}")
+            return True
+        elif direction == 'right' and target > seg_right + 1e-6:
+            new_width = (target - seg_left) + overshoot
             segment.bbox['width'] = new_width
-            print(f"    ✓ Сегмент {segment.segment_id} расширен влево до {target_x}")
+            print(f"    ✓ Сегмент {segment.segment_id} расширен вправо до {target} (bbox перпендикуляра)")
             if l_junction.id == 10:
                 print(f"    DEBUG J10: bbox changed from {original_bbox} to {segment.bbox}")
             return True
         else:
-            # Extend to the right
-            new_width = target_x + perpendicular_segment.bbox['width'] - segment.bbox['x']
-            segment.bbox['width'] = new_width
-            print(f"    ✓ Сегмент {segment.segment_id} расширен вправо до {target_x + perpendicular_segment.bbox['width']}")
             if l_junction.id == 10:
-                print(f"    DEBUG J10: bbox changed from {original_bbox} to {segment.bbox}")
-            return True
-    
-    elif segment.orientation == 'vertical' and perpendicular_segment.orientation == 'horizontal':
-        # Extend vertical segment to reach horizontal segment's Y
-        target_y = perpendicular_segment.bbox['y']
-        
-        # Determine if we need to extend up or down
-        if target_y < segment.bbox['y']:
-            # Extend upward
-            new_y = target_y
-            new_height = segment.bbox['y'] + segment.bbox['height'] - target_y
+                print("    DEBUG J10: target X within span or no extension needed")
+            return False
+
+    if segment.orientation == 'vertical' and perpendicular_segment.orientation == 'horizontal':
+        seg_top = segment.bbox['y']
+        seg_bottom = segment.bbox['y'] + segment.bbox['height']
+        direction = 'down' if abs(l_junction.y - seg_bottom) <= abs(l_junction.y - seg_top) else 'up'
+        target = target_y_by_direction(direction, perpendicular_segment.bbox)
+
+        if direction == 'up' and target < seg_top - 1e-6:
+            new_y = target - overshoot
             segment.bbox['y'] = new_y
+            segment.bbox['height'] = seg_bottom - new_y
+            print(f"    ✓ Сегмент {segment.segment_id} расширен вверх до {target} (bbox перпендикуляра)")
+            if l_junction.id == 10:
+                print(f"    DEBUG J10: bbox changed from {original_bbox} to {segment.bbox}")
+            return True
+        elif direction == 'down' and target > seg_bottom + 1e-6:
+            new_height = (target - seg_top) + overshoot
             segment.bbox['height'] = new_height
-            print(f"    ✓ Сегмент {segment.segment_id} расширен вверх до {target_y}")
+            print(f"    ✓ Сегмент {segment.segment_id} расширен вниз до {target} (bbox перпендикуляра)")
             if l_junction.id == 10:
                 print(f"    DEBUG J10: bbox changed from {original_bbox} to {segment.bbox}")
             return True
         else:
-            # Extend downward
-            new_height = target_y + perpendicular_segment.bbox['height'] - segment.bbox['y']
-            segment.bbox['height'] = new_height
-            print(f"    ✓ Сегмент {segment.segment_id} расширен вниз до {target_y + perpendicular_segment.bbox['height']}")
             if l_junction.id == 10:
-                print(f"    DEBUG J10: bbox changed from {original_bbox} to {segment.bbox}")
-            return True
-    
+                print("    DEBUG J10: target Y within span or no extension needed")
+            return False
+
     if l_junction.id == 10:
         print(f"    DEBUG J10: No perpendicular extension performed - orientations: {segment.orientation} vs {perpendicular_segment.orientation}")
     return False
@@ -2600,42 +2611,73 @@ def process_l_junction_extensions(junctions: List[JunctionPoint],
             print(f"    ✗ Недостаточно сегментов для L-junction {l_junction.id}")
             continue
         
-        # Сохраняем оригинальные границы сегмента для отладки
-        selected_segment = all_connected_segments[0]
+        # Выбираем сегмент для расширения: предпочитаем сегмент от проема,
+        # чтобы закрыть соединение проем ↔ перпендикулярная стена
+        selected_segment = None
+        for s in opening_segments:
+            selected_segment = s
+            break
+        if selected_segment is None:
+            selected_segment = all_connected_segments[0]
         original_bbox = selected_segment.bbox.copy()
         print(f"    ✓ Выбран сегмент для расширения: {selected_segment.segment_id}")
         print(f"    ✓ Оригинальные границы segment bbox: {original_bbox}")
         
-        # Меняем порядок операций: сначала расширяем до границы полигона, потом до перпендикуляра
-        # Это гарантирует, что расширение до полигона не будет отменено последующим расширением
-        
-        # 1. Сначала расширяем до границы полигона
-        print(f"    → Шаг 1: Расширение до границы полигона...")
-        extended_to_edge = extend_segment_to_polygon_edge(
-            selected_segment, l_junction, wall_polygons, wall_thickness
-        )
-        
-        if extended_to_edge:
-            extended_count += 1
-            print(f"    ✓ После расширения до границы полигона: {selected_segment.bbox}")
-        
-        # 2. Затем расширяем до перпендикулярного сегмента, если он есть
-        if len(all_connected_segments) >= 2:
-            perpendicular_segment = all_connected_segments[1]
+        # Новый порядок: сначала тянем до перпендикулярного bbox (дальняя сторона),
+        # затем при необходимости — до границы полигона как запасной вариант.
+        extended_to_edge = False
+        extended_to_perpendicular = False
+
+        # Ищем перпендикулярный сегмент: сначала среди подключенных,
+        # если не нашли — среди всех сегментов по выравниванию
+        perpendicular_segment = None
+        for s in all_connected_segments:
+            if s is selected_segment:
+                continue
+            if s.orientation != selected_segment.orientation:
+                perpendicular_segment = s
+                break
+        if perpendicular_segment is None:
+            # Поиск среди всех сегментов по выравниванию относительно узла
+            align_tol = wall_thickness * 0.75
+            all_segs = wall_segments + junction_wall_segments
+            if selected_segment.orientation == 'horizontal':
+                # Ищем вертикальный соосный по X
+                for s in all_segs:
+                    if s.orientation == 'vertical' and abs((s.bbox['x'] + s.bbox['width']/2) - l_junction.x) <= align_tol:
+                        perpendicular_segment = s
+                        break
+            else:
+                # Ищем горизонтальный соосный по Y
+                for s in all_segs:
+                    if s.orientation == 'horizontal' and abs((s.bbox['y'] + s.bbox['height']/2) - l_junction.y) <= align_tol:
+                        perpendicular_segment = s
+                        break
+
+        if perpendicular_segment is not None:
             print(f"    ✓ Выбран перпендикулярный сегмент: {perpendicular_segment.segment_id}")
-            print(f"    → Шаг 2: Расширение до перпендикулярного сегмента...")
-            
-            # Extend to align with perpendicular segment
+            print(f"    → Шаг 1: Расширение до перпендикулярного bbox (дальняя сторона)...")
+
             extended_to_perpendicular = extend_segment_to_perpendicular_x(
                 selected_segment, perpendicular_segment, l_junction
             )
-            
+
             if extended_to_perpendicular:
                 extended_count += 1
                 print(f"    ✓ После расширения до перпендикуляра: {selected_segment.bbox}")
+
+        # Если перпендикулярный сегмент не дал результата — пробуем границу полигона
+        if not extended_to_perpendicular:
+            print(f"    → Шаг 2: Расширение до границы полигона (fallback)...")
+            extended_to_edge = extend_segment_to_polygon_edge(
+                selected_segment, l_junction, wall_polygons, wall_thickness
+            )
+            if extended_to_edge:
+                extended_count += 1
+                print(f"    ✓ После расширения до границы полигона: {selected_segment.bbox}")
         
         # Итоговая информация о расширении
-        if extended_to_edge or extended_to_perpendicular:
+        if extended_to_perpendicular or extended_to_edge:
             print(f"    ✓ Итог: Сегмент {selected_segment.segment_id} расширен")
             print(f"      оригинал: {original_bbox}")
             print(f"      результат: {selected_segment.bbox}")
@@ -3512,56 +3554,11 @@ def visualize_polygons_opening_based_with_junction_types():
     # Добавляем сегменты из junctions
     all_wall_segments_for_visualization.extend(junction_wall_segments)
     
-    print(f"\n{'='*60}")
-    print(f"ИТОГО: {len(wall_segments)} сегментов стен из проемов + {len(junction_wall_segments)} сегментов стен из junctions + {extended_count} расширенных сегментов")
-    print(f"Объединенный список для визуализации: {len(all_wall_segments_for_visualization)} сегментов")
-    print(f"{'='*60}")
-    
     # Сохраняем все данные в JSON
-    print(f"\n{'='*60}")
-    print("СОХРАНЕНИЕ ДАННЫХ В JSON")
-    print(f"{'='*60}")
-    
     save_json_data(json_data, output_json_path)
     
     # Создаем SVG на основе сохраненных JSON данных
-    print(f"\n{'='*60}")
-    print("СОЗДАНИЕ SVG ИЗ JSON ДАННЫХ")
-    print(f"{'='*60}")
-    
     create_svg_from_json(output_json_path, output_path, data)
-    
-    # Выводим статистику
-    wall_polygons_count = len(data.get('wall_polygons', []))
-    pillar_polygons_count = len(data.get('pillar_polygons', []))
-    windows_count = sum(1 for o in data.get('openings', []) if o.get('type') == 'window')
-    doors_count = sum(1 for o in data.get('openings', []) if o.get('type') == 'door')
-    junctions_count = len(junctions_with_types)
-    
-    # Считаем статистику по типам junctions
-    type_counts = {}
-    for junction in junctions_with_types:
-        jtype = junction.detected_type
-        type_counts[jtype] = type_counts.get(jtype, 0) + 1
-    
-    print(f"\nСтатистика объектов:")
-    print(f"  Полигоны стен: {wall_polygons_count}")
-    print(f"  Сегменты стен из проемов: {len(wall_segments)}")
-    print(f"  Сегменты стен из junctions: {len(junction_wall_segments)}")
-    print(f"  Расширенные сегменты: {extended_count} (оригинальные сегменты увеличены)")
-    print(f"  Выровненные стены: встроено в существующие сегменты")
-    print(f"  Всего сегментов стен: {len(wall_segments) + len(junction_wall_segments)}")
-    print(f"  Объединенный список для визуализации: {len(all_wall_segments_for_visualization)}")
-    print(f"  Колонны: {pillar_polygons_count}")
-    print(f"  Квадраты колонн: {json_data['statistics']['total_pillar_squares']}")
-    print(f"  Окна: {windows_count}")
-    print(f"  Двери: {doors_count}")
-    print(f"  Junctions: {junctions_count}")
-    print(f"  Толщина стен (минимальная толщина двери): {wall_thickness:.1f} px")
-    
-    print(f"\nСтатистика по типам junctions:")
-    for jtype, count in type_counts.items():
-        print(f"  {jtype}: {count}")
     
     # Добавляем объекты outline, foundation и street в основной JSON файл
     copy_to_main_json(input_path, output_json_path)
@@ -4872,56 +4869,11 @@ def main():
     # Добавляем сегменты из junctions
     all_wall_segments_for_visualization.extend(junction_wall_segments)
     
-    print(f"\n{'='*60}")
-    print(f"ИТОГО: {len(wall_segments)} сегментов стен из проемов + {len(junction_wall_segments)} сегментов стен из junctions + {extended_count} расширенных сегментов")
-    print(f"Объединенный список для визуализации: {len(all_wall_segments_for_visualization)} сегментов")
-    print(f"{'='*60}")
-    
     # Сохраняем все данные в JSON
-    print(f"\n{'='*60}")
-    print("СОХРАНЕНИЕ ДАННЫХ В JSON")
-    print(f"{'='*60}")
-    
     save_json_data(json_data, output_json_path)
     
     # Создаем SVG на основе сохраненных JSON данных
-    print(f"\n{'='*60}")
-    print("СОЗДАНИЕ SVG ИЗ JSON ДАННЫХ")
-    print(f"{'='*60}")
-    
     create_svg_from_json(output_json_path, output_path, data)
-    
-    # Выводим статистику
-    wall_polygons_count = len(data.get('wall_polygons', []))
-    pillar_polygons_count = len(data.get('pillar_polygons', []))
-    windows_count = sum(1 for o in data.get('openings', []) if o.get('type') == 'window')
-    doors_count = sum(1 for o in data.get('openings', []) if o.get('type') == 'door')
-    junctions_count = len(junctions_with_types)
-    
-    # Считаем статистику по типам junctions
-    type_counts = {}
-    for junction in junctions_with_types:
-        jtype = junction.detected_type
-        type_counts[jtype] = type_counts.get(jtype, 0) + 1
-    
-    print(f"\nСтатистика объектов:")
-    print(f"  Полигоны стен: {wall_polygons_count}")
-    print(f"  Сегменты стен из проемов: {len(wall_segments)}")
-    print(f"  Сегменты стен из junctions: {len(junction_wall_segments)}")
-    print(f"  Расширенные сегменты: {extended_count} (оригинальные сегменты увеличены)")
-    print(f"  Выровненные стены: встроено в существующие сегменты")
-    print(f"  Всего сегментов стен: {len(wall_segments) + len(junction_wall_segments)}")
-    print(f"  Объединенный список для визуализации: {len(all_wall_segments_for_visualization)}")
-    print(f"  Колонны: {pillar_polygons_count}")
-    print(f"  Квадраты колонн: {json_data['statistics']['total_pillar_squares']}")
-    print(f"  Окна: {windows_count}")
-    print(f"  Двери: {doors_count}")
-    print(f"  Junctions: {junctions_count}")
-    print(f"  Толщина стен (минимальная толщина двери): {wall_thickness:.1f} px")
-    
-    print(f"\nСтатистика по типам junctions:")
-    for jtype, count in type_counts.items():
-        print(f"  {jtype}: {count}")
     
     # Добавляем объекты outline, foundation и street в основной JSON файл
     copy_to_main_json(input_path, output_json_path)

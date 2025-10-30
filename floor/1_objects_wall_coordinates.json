@@ -2,7 +2,7 @@
   "metadata": {
     "source_file": "1_objects.json",
     "wall_thickness": 22.0,
-    "timestamp": "2025-10-30T17:25:27.843694",
+    "timestamp": "2025-10-30T18:33:04.518731",
     "version": "1.0"
   },
   "junctions": [
@@ -750,7 +750,7 @@
       "bbox": {
         "x": 204.5,
         "y": 139.0,
-        "width": 84.33333333333331,
+        "width": 82.5,
         "height": 22.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -894,7 +894,7 @@
       "bbox": {
         "x": 204.5,
         "y": 966.5,
-        "width": 73.64285714285717,
+        "width": 74.5,
         "height": 22.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -1775,7 +1775,7 @@
     "total_wall_segments_from_junctions": 10,
     "total_openings": 12,
     "total_pillar_squares": 2,
-    "extended_segments": 10,
+    "extended_segments": 7,
     "has_building_outline": false,
     "has_foundation": true,
     "has_street": false
