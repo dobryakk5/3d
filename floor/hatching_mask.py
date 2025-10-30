@@ -66,7 +66,7 @@ MIN_NEIGHBORS = None  # Минимальное количество соседе
 ADD_LINES = False  # Добавлять горизонтальные и вертикальные линии (True/False)
 MIN_LINE_LENGTH = 10  # Минимальная длина линии для добавления
 MIN_LINE_OVERLAP_RATIO = 0.3  # Минимальное отношение пересечения линии с штриховкой
-OUTPUT_FILENAME = 'enhanced_hatching_strict_mask.png'  # Имя выходного файла
+OUTPUT_FILENAME = 'enhanced_hatching_strict_mask.png'  # Имя выходного файла (по умолчанию, будет переопределено по префиксу)
 
 def enhance_local_contrast(image, clip_limit=2.0, tile_grid_size=(8, 8)):
     """Enhance local contrast using CLAHE"""
@@ -386,10 +386,9 @@ def test_enhanced_hatching():
         return None
 
 # Примеры использования с разными фильтрами
-def test_with_min_area_filter():
+def test_with_min_area_filter(image_path='plan_floor1.jpg'):
     """Тестирование с фильтром по минимальной площади"""
     print("\n=== Тест с фильтром по минимальной площади ===")
-    image_path = 'plan_floor1.jpg'
     image = Image.open(image_path).convert('RGB')
     img_np = np.array(image)
     
@@ -405,10 +404,9 @@ def test_with_min_area_filter():
     print("Результат сохранен в: hatching_min_area_filter.png")
     return wall_mask
 
-def test_with_rectangularity_filter():
+def test_with_rectangularity_filter(image_path='plan_floor1.jpg'):
     """Тестирование с фильтром по прямоугольности"""
     print("\n=== Тест с фильтром по прямоугольности ===")
-    image_path = 'plan_floor1.jpg'
     image = Image.open(image_path).convert('RGB')
     img_np = np.array(image)
     
@@ -424,10 +422,9 @@ def test_with_rectangularity_filter():
     print("Результат сохранен в: hatching_rectangularity_filter.png")
     return wall_mask
 
-def test_with_multiple_filters():
+def test_with_multiple_filters(image_path='plan_floor1.jpg'):
     """Тестирование с несколькими фильтрами"""
     print("\n=== Тест с несколькими фильтрами ===")
-    image_path = 'plan_floor1.jpg'
     image = Image.open(image_path).convert('RGB')
     img_np = np.array(image)
     
@@ -447,8 +444,55 @@ def test_with_multiple_filters():
     return wall_mask
 
 if __name__ == '__main__':
-    # Запускаем основной тест без фильтров
-    test_enhanced_hatching()
+    import sys
+    
+    # Проверяем, передан ли путь к входному файлу
+    if len(sys.argv) > 1:
+        image_path = sys.argv[1]
+        print(f"Используем входной файл: {image_path}")
+    else:
+        # Используем файл по умолчанию, если аргумент не передан
+        image_path = 'plan_floor1.jpg'
+        print(f"Аргумент не передан, используем файл по умолчанию: {image_path}")
+    
+    # Модифицируем функцию test_enhanced_hatching для использования переданного пути
+    def test_enhanced_hatching_with_path(image_file):
+        """Тестирование исправленной функции обнаружения штриховки с указанным файлом"""
+        try:
+            # Загрузка изображения
+            image = Image.open(image_file).convert('RGB')
+            img_np = np.array(image)
+            
+            print("Тестирование исправленной функции обнаружения штриховки...")
+            start_time = time.time()
+            
+            # Применение функции с параметрами из глобальных переменных
+            wall_mask = detect_hatching_enhanced_fixed(img_np)
+            
+            end_time = time.time()
+            
+            # Сохранение результата с префиксом от входного файла
+            import os
+            base_name = os.path.splitext(os.path.basename(image_file))[0]
+            output_filename = f"{base_name}_hatching_mask.png"
+            cv2.imwrite(output_filename, wall_mask)
+            
+            # Статистика
+            hatching_pixels = np.sum(wall_mask > 0)
+            print(f"Обнаружено пикселей штриховки: {hatching_pixels}")
+            print(f"Время выполнения: {end_time - start_time:.2f} секунд")
+            print(f"Результат сохранен в: {output_filename}")
+            
+            return wall_mask
+            
+        except Exception as e:
+            print(f"Ошибка при тестировании: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    # Запускаем основной тест без фильтров с указанным файлом
+    test_enhanced_hatching_with_path(image_path)
     
     # Раскомментируйте нужные тесты:
     # test_with_min_area_filter()        # Только фильтр по минимальной площади
