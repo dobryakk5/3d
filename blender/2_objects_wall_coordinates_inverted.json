@@ -1,0 +1,2906 @@
+{
+  "metadata": {
+    "source_file": "2_objects.json",
+    "wall_thickness": 21.0,
+    "timestamp": "2025-10-30T13:43:02.216817",
+    "version": "1.0"
+  },
+  "junctions": [
+    {
+      "id": 1,
+      "x": 481.5,
+      "y": 723.0,
+      "junction_type": "wall_corner_90deg",
+      "detected_type": "unknown",
+      "directions": [
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_1_to_edge_up",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "x": 10.5,
+      "y": 1012.0,
+      "junction_type": "door_left_corner",
+      "detected_type": "L",
+      "directions": [
+        "left",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_2_to_14_up",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_1_right_35_to_2",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "x": 255.5,
+      "y": 416.0,
+      "junction_type": "door_right_corner",
+      "detected_type": "L",
+      "directions": [
+        "right",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_3_to_53_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_junction_3_to_8_up",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "x": 875.5,
+      "y": 895.0,
+      "junction_type": "door_right_corner",
+      "detected_type": "L",
+      "directions": [
+        "right",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_4_to_19_up",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_4_left_27_to_4",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "x": 303.5,
+      "y": 1012.0,
+      "junction_type": "door_right_corner",
+      "detected_type": "L",
+      "directions": [
+        "right",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_5_to_9_up",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_1_left_28_to_5",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "x": 875.5,
+      "y": 70.0,
+      "junction_type": "window_left_corner",
+      "detected_type": "L",
+      "directions": [
+        "right",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_6_to_18_down",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_3_left_21_to_6",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "x": 11.5,
+      "y": 70.0,
+      "junction_type": "window_right_corner",
+      "detected_type": "L",
+      "directions": [
+        "left",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_7_to_12_down",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_2_right_30_to_7",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "x": 255.5,
+      "y": 329.0,
+      "junction_type": "window_right_corner",
+      "detected_type": "unknown",
+      "directions": [
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_3_to_8_up",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_2_right_31_to_8",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "x": 304.5,
+      "y": 895.0,
+      "junction_type": "window_right_corner",
+      "detected_type": "L",
+      "directions": [
+        "left",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_5_to_9_up",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_window_5_right_33_to_9",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "x": 481.5,
+      "y": 71.0,
+      "junction_type": "wall_junction_t",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "right",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_10_to_17_down",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_2_left_22_to_10",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_window_3_right_29_to_10",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "x": 619.5,
+      "y": 652.0,
+      "junction_type": "wall_junction_t",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "right",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_11_to_19_left",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_junction_11_to_20_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_door_5_top_41_to_11",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "x": 10.5,
+      "y": 415.0,
+      "junction_type": "wall_junction_cross",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "up",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_7_to_12_down",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_12_to_53_left",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_7_top_37_to_12",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "x": 481.5,
+      "y": 459.0,
+      "junction_type": "wall_junction_cross",
+      "detected_type": "unknown",
+      "directions": [
+        "left"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_18_to_13_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_4_top_38_to_13",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "x": 10.5,
+      "y": 651.0,
+      "junction_type": "wall_junction_cross",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "up",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_2_to_14_up",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_14_to_edge_left",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_6_bottom_48_to_14",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "x": 617.5,
+      "y": 897.0,
+      "junction_type": "wall_junction_l",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "right",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_15_to_16_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_4_right_34_to_15",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_5_bottom_49_to_15",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "x": 479.5,
+      "y": 897.0,
+      "junction_type": "wall_junction_l",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "right",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_15_to_16_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_16_to_edge_up",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_5_left_26_to_16",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "x": 480.5,
+      "y": 329.0,
+      "junction_type": "door_corner",
+      "detected_type": "T",
+      "directions": [
+        "right",
+        "up",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_10_to_17_down",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_1_top_36_to_17",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_2_left_23_to_17",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "x": 876.5,
+      "y": 458.0,
+      "junction_type": "door_corner",
+      "detected_type": "T",
+      "directions": [
+        "right",
+        "up",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_6_to_18_down",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_18_to_13_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_8_top_39_to_18",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "x": 876.5,
+      "y": 648.0,
+      "junction_type": "door_corner",
+      "detected_type": "T",
+      "directions": [
+        "right",
+        "up",
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_4_to_19_up",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_11_to_19_left",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_window_8_bottom_46_to_19",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "x": 480.5,
+      "y": 649.0,
+      "junction_type": "window_corner",
+      "detected_type": "T",
+      "directions": [
+        "left",
+        "right",
+        "up"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_11_to_20_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_4_bottom_47_to_20",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_door_3_left_24_to_20",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "x": 804.5,
+      "y": 70.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [
+        "left"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_3_left_21_to_6",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "x": 236.5,
+      "y": 70.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [
+        "left"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_2_left_22_to_10",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "x": 354.5,
+      "y": 330.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_2_left_23_to_17",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "x": 445.5,
+      "y": 649.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_3_left_24_to_20",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "x": 442.5,
+      "y": 650.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 26,
+      "x": 448.5,
+      "y": 894.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [
+        "left"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_5_left_26_to_16",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "x": 815.5,
+      "y": 895.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [
+        "left"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_4_left_27_to_4",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "x": 271.5,
+      "y": 1012.0,
+      "junction_type": "wall_intersection",
+      "detected_type": "unknown",
+      "directions": [
+        "left"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_1_left_28_to_5",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "x": 649.5,
+      "y": 70.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_3_right_29_to_10",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "x": 81.5,
+      "y": 70.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_2_right_30_to_7",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "x": 275.5,
+      "y": 330.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_2_right_31_to_8",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "x": 365.5,
+      "y": 649.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_3_right_32_to_56",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "x": 356.5,
+      "y": 895.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_5_right_33_to_9",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "x": 723.5,
+      "y": 896.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_4_right_34_to_15",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "x": 46.5,
+      "y": 1012.0,
+      "junction_type": "wall_end",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_1_right_35_to_2",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "x": 478.5,
+      "y": 356.0,
+      "junction_type": "door_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_1_top_36_to_17",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "x": 11.5,
+      "y": 446.0,
+      "junction_type": "door_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_7_top_37_to_12",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "x": 481.5,
+      "y": 477.0,
+      "junction_type": "door_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_4_top_38_to_13",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "x": 875.5,
+      "y": 486.0,
+      "junction_type": "door_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_8_top_39_to_18",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "x": 11.5,
+      "y": 555.0,
+      "junction_type": "door_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_6_top_40_to_44",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_window_7_bottom_44_to_40",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "x": 618.5,
+      "y": 736.0,
+      "junction_type": "door_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_5_top_41_to_11",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "x": 483.5,
+      "y": 435.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_1_bottom_42_to_43",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "x": 478.5,
+      "y": 436.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_1_bottom_42_to_43",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "x": 10.5,
+      "y": 509.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [
+        "down"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_6_top_40_to_44",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_window_7_bottom_44_to_40",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "x": 478.5,
+      "y": 548.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 46,
+      "x": 875.5,
+      "y": 549.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_8_bottom_46_to_19",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "x": 481.5,
+      "y": 549.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_4_bottom_47_to_20",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "x": 10.5,
+      "y": 616.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_window_6_bottom_48_to_14",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "x": 618.5,
+      "y": 807.0,
+      "junction_type": "window_frame",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_5_bottom_49_to_15",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "x": 118.5,
+      "y": 519.0,
+      "junction_type": "room_corner",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 51,
+      "x": 310.5,
+      "y": 535.0,
+      "junction_type": "room_corner",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 52,
+      "x": 311.5,
+      "y": 538.0,
+      "junction_type": "room_corner",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 53,
+      "x": 122.5,
+      "y": 425.0,
+      "junction_type": "opening_corner",
+      "detected_type": "straight",
+      "directions": [
+        "left",
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_3_to_53_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_12_to_53_left",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "x": 124.5,
+      "y": 537.0,
+      "junction_type": "opening_corner",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 55,
+      "x": 311.5,
+      "y": 637.0,
+      "junction_type": "structure_corner",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 56,
+      "x": 311.5,
+      "y": 640.0,
+      "junction_type": "structure_corner",
+      "detected_type": "straight",
+      "directions": [
+        "left",
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_56_to_57_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        },
+        {
+          "segment_id": "wall_door_3_right_32_to_56",
+          "segment_type": "from_openings",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "x": 286.5,
+      "y": 640.0,
+      "junction_type": "structure_corner",
+      "detected_type": "straight",
+      "directions": [
+        "left",
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_56_to_57_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_57_to_58_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "x": 146.5,
+      "y": 640.0,
+      "junction_type": "structure_corner",
+      "detected_type": "straight",
+      "directions": [
+        "left",
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_57_to_58_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_58_to_60_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "x": 122.5,
+      "y": 525.0,
+      "junction_type": "junction_unknown",
+      "detected_type": "unknown",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": []
+    },
+    {
+      "id": 60,
+      "x": 125.5,
+      "y": 638.0,
+      "junction_type": "junction_unknown",
+      "detected_type": "straight",
+      "directions": [
+        "left",
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_58_to_60_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        },
+        {
+          "segment_id": "wall_junction_60_to_61_right",
+          "segment_type": "from_junctions",
+          "connection_type": "start"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "x": 122.5,
+      "y": 638.0,
+      "junction_type": "junction_unknown",
+      "detected_type": "straight",
+      "directions": [
+        "left",
+        "right"
+      ],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_60_to_61_right",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "x": 481.5,
+      "y": 671.5,
+      "junction_type": "polygon_edge",
+      "detected_type": "wall_end",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_1_to_edge_up",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "x": 364.5,
+      "y": 651.0,
+      "junction_type": "polygon_edge",
+      "detected_type": "wall_end",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_14_to_edge_left",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "x": 479.5,
+      "y": 817.0,
+      "junction_type": "polygon_edge",
+      "detected_type": "wall_end",
+      "directions": [],
+      "confidence": 1.0,
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_junction_16_to_edge_up",
+          "segment_type": "from_junctions",
+          "connection_type": "end"
+        }
+      ]
+    }
+  ],
+  "wall_segments_from_openings": [
+    {
+      "segment_id": "wall_window_2_left_22_to_10",
+      "opening_id": "window_2",
+      "edge_side": "left",
+      "start_junction_id": 22,
+      "end_junction_id": 10,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 236.5,
+        "y": 58.5,
+        "width": 245.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_3",
+          "original_coords": {
+            "x": 721.0,
+            "y": 58.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_2_right_30_to_7",
+      "opening_id": "window_2",
+      "edge_side": "right",
+      "start_junction_id": 30,
+      "end_junction_id": 7,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 1.0,
+        "y": 58.5,
+        "width": 80.5,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_3",
+          "original_coords": {
+            "x": 1121.0,
+            "y": 58.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_3_left_21_to_6",
+      "opening_id": "window_3",
+      "edge_side": "left",
+      "start_junction_id": 21,
+      "end_junction_id": 6,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 802.5,
+        "y": 58.5,
+        "width": 83.5,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_3",
+          "original_coords": {
+            "x": 316.5,
+            "y": 58.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_3_right_29_to_10",
+      "opening_id": "window_3",
+      "edge_side": "right",
+      "start_junction_id": 29,
+      "end_junction_id": 10,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 481.5,
+        "y": 58.5,
+        "width": 168.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_3",
+          "original_coords": {
+            "x": 553.0,
+            "y": 58.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_4_left_27_to_4",
+      "opening_id": "window_4",
+      "edge_side": "left",
+      "start_junction_id": 27,
+      "end_junction_id": 4,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 814.2142857142858,
+        "y": 884.5,
+        "width": 71.78571428571428,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_5",
+          "original_coords": {
+            "x": 316.5,
+            "y": 884.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_4_right_34_to_15",
+      "opening_id": "window_4",
+      "edge_side": "right",
+      "start_junction_id": 34,
+      "end_junction_id": 15,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 617.5,
+        "y": 884.5,
+        "width": 106.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_5",
+          "original_coords": {
+            "x": 479.0,
+            "y": 884.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_5_left_26_to_16",
+      "opening_id": "window_5",
+      "edge_side": "left",
+      "start_junction_id": 26,
+      "end_junction_id": 16,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 448.5,
+        "y": 884.5,
+        "width": 31.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_5",
+          "original_coords": {
+            "x": 723.0,
+            "y": 884.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_5_right_33_to_9",
+      "opening_id": "window_5",
+      "edge_side": "right",
+      "start_junction_id": 33,
+      "end_junction_id": 9,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 293.0,
+        "y": 884.5,
+        "width": 63.5,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_5",
+          "original_coords": {
+            "x": 846.0,
+            "y": 884.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_6_top_40_to_44",
+      "opening_id": "window_6",
+      "edge_side": "top",
+      "start_junction_id": 40,
+      "end_junction_id": 44,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 1.5,
+        "y": 509.0,
+        "width": 21.0,
+        "height": 46.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_6",
+          "original_coords": {
+            "x": 1180.0,
+            "y": 509.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_6_bottom_48_to_14",
+      "opening_id": "window_6",
+      "edge_side": "bottom",
+      "start_junction_id": 48,
+      "end_junction_id": 14,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 1.5,
+        "y": 616.0,
+        "width": 21.0,
+        "height": 35.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_6",
+          "original_coords": {
+            "x": 1180.0,
+            "y": 616.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_7_top_37_to_12",
+      "opening_id": "window_7",
+      "edge_side": "top",
+      "start_junction_id": 37,
+      "end_junction_id": 12,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 1.5,
+        "y": 415.0,
+        "width": 21.0,
+        "height": 31.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_6",
+          "original_coords": {
+            "x": 1180.0,
+            "y": 415.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_7_bottom_44_to_40",
+      "opening_id": "window_7",
+      "edge_side": "bottom",
+      "start_junction_id": 44,
+      "end_junction_id": 40,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 1.5,
+        "y": 509.0,
+        "width": 21.0,
+        "height": 46.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_6",
+          "original_coords": {
+            "x": 1180.0,
+            "y": 509.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_1_top_36_to_17",
+      "opening_id": "door_1",
+      "edge_side": "top",
+      "start_junction_id": 36,
+      "end_junction_id": 17,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 329.0,
+        "width": 21.0,
+        "height": 27.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 709.5,
+            "y": 329.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_1_bottom_42_to_43",
+      "opening_id": "door_1",
+      "edge_side": "bottom",
+      "start_junction_id": 42,
+      "end_junction_id": 43,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 435.0,
+        "width": 21.0,
+        "height": 0.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 709.5,
+            "y": 435.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_4_top_38_to_13",
+      "opening_id": "door_4",
+      "edge_side": "top",
+      "start_junction_id": 38,
+      "end_junction_id": 13,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 459.0,
+        "width": 21.0,
+        "height": 18.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 709.5,
+            "y": 459.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_4_bottom_47_to_20",
+      "opening_id": "door_4",
+      "edge_side": "bottom",
+      "start_junction_id": 47,
+      "end_junction_id": 20,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 549.0,
+        "width": 21.0,
+        "height": 100.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 709.5,
+            "y": 549.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_1_left_28_to_5",
+      "opening_id": "window_1",
+      "edge_side": "left",
+      "start_junction_id": 28,
+      "end_junction_id": 5,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 270.5,
+        "y": 1000.5,
+        "width": 43.5,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_1",
+          "original_coords": {
+            "x": 888.5,
+            "y": 1000.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_1_right_35_to_2",
+      "opening_id": "window_1",
+      "edge_side": "right",
+      "start_junction_id": 35,
+      "end_junction_id": 2,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 0.0,
+        "y": 1000.5,
+        "width": 46.5,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_1",
+          "original_coords": {
+            "x": 1156.0,
+            "y": 1000.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_8_top_39_to_18",
+      "opening_id": "window_8",
+      "edge_side": "top",
+      "start_junction_id": 39,
+      "end_junction_id": 18,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 865.5,
+        "y": 458.0,
+        "width": 21.0,
+        "height": 28.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_8",
+          "original_coords": {
+            "x": 316.0,
+            "y": 458.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_window_8_bottom_46_to_19",
+      "opening_id": "window_8",
+      "edge_side": "bottom",
+      "start_junction_id": 46,
+      "end_junction_id": 19,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 865.5,
+        "y": 549.0,
+        "width": 21.0,
+        "height": 99.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_8",
+          "original_coords": {
+            "x": 316.0,
+            "y": 549.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_2_left_23_to_17",
+      "opening_id": "door_2",
+      "edge_side": "left",
+      "start_junction_id": 23,
+      "end_junction_id": 17,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 354.5,
+        "y": 318.0,
+        "width": 126.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_2",
+          "original_coords": {
+            "x": 722.0,
+            "y": 318.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_2_right_31_to_8",
+      "opening_id": "door_2",
+      "edge_side": "right",
+      "start_junction_id": 31,
+      "end_junction_id": 8,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 255.5,
+        "y": 318.0,
+        "width": 20.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_2",
+          "original_coords": {
+            "x": 927.0,
+            "y": 318.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_3_left_24_to_20",
+      "opening_id": "door_3",
+      "edge_side": "left",
+      "start_junction_id": 24,
+      "end_junction_id": 20,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 445.5,
+        "y": 638.5,
+        "width": 35.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 722.0,
+            "y": 638.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_3_right_32_to_56",
+      "opening_id": "door_3",
+      "edge_side": "right",
+      "start_junction_id": 32,
+      "end_junction_id": 56,
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 311.5,
+        "y": 638.5,
+        "width": 54.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 837.0,
+            "y": 638.5
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_5_top_41_to_11",
+      "opening_id": "door_5",
+      "edge_side": "top",
+      "start_junction_id": 41,
+      "end_junction_id": 11,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 609.0,
+        "y": 652.0,
+        "width": 21.0,
+        "height": 84.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_5",
+          "original_coords": {
+            "x": 572.5,
+            "y": 652.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
+      "segment_id": "wall_door_5_bottom_49_to_15",
+      "opening_id": "door_5",
+      "edge_side": "bottom",
+      "start_junction_id": 49,
+      "end_junction_id": 15,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 609.0,
+        "y": 807.0,
+        "width": 21.0,
+        "height": 90.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_5",
+          "original_coords": {
+            "x": 572.5,
+            "y": 807.0
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    }
+  ],
+  "wall_segments_from_junctions": [
+    {
+      "segment_id": "wall_junction_1_to_edge_up",
+      "start_junction_id": 1,
+      "end_junction_id": 62,
+      "direction": "up",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 671.5,
+        "width": 21.0,
+        "height": 51.5,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 710.5,
+            "y": 671.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_2_to_14_up",
+      "start_junction_id": 2,
+      "end_junction_id": 14,
+      "direction": "up",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 1.5,
+        "y": 651.0,
+        "width": 21.0,
+        "height": 361.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_6",
+          "original_coords": {
+            "x": 1181.5,
+            "y": 651.0
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_3_to_53_right",
+      "start_junction_id": 3,
+      "end_junction_id": 53,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 1.5,
+        "y": 409.9166666666667,
+        "width": 264.5,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "polygon_id": "wall_polygon_6",
+          "original_coords": {
+            "x": 936.5,
+            "y": 405.5
+          },
+          "alignment_type": "polygon",
+          "relationship_scores": [
+            {
+              "polygon_id": "wall_polygon_6",
+              "relationship_type": "inside",
+              "score": 100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_3_to_8_up",
+      "start_junction_id": 3,
+      "end_junction_id": 8,
+      "direction": "up",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 245.0,
+        "y": 329.0,
+        "width": 21.0,
+        "height": 87.0,
+        "orientation": "vertical"
+      }
+    },
+    {
+      "segment_id": "wall_junction_4_to_19_up",
+      "start_junction_id": 4,
+      "end_junction_id": 19,
+      "direction": "up",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 865.5,
+        "y": 648.0,
+        "width": 21.0,
+        "height": 247.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_8",
+          "original_coords": {
+            "x": 316.5,
+            "y": 648.0
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_5_to_9_up",
+      "start_junction_id": 5,
+      "end_junction_id": 9,
+      "direction": "up",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 293.0,
+        "y": 895.0,
+        "width": 21.0,
+        "height": 117.0,
+        "orientation": "vertical"
+      }
+    },
+    {
+      "segment_id": "wall_junction_6_to_18_down",
+      "start_junction_id": 6,
+      "end_junction_id": 18,
+      "direction": "down",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 865.5,
+        "y": 70.0,
+        "width": 21.0,
+        "height": 388.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_8",
+          "original_coords": {
+            "x": 316.5,
+            "y": 70.0
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_7_to_12_down",
+      "start_junction_id": 7,
+      "end_junction_id": 12,
+      "direction": "down",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 1.5,
+        "y": 70.0,
+        "width": 21.0,
+        "height": 345.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "window_6",
+          "original_coords": {
+            "x": 1180.5,
+            "y": 70.0
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_10_to_17_down",
+      "start_junction_id": 10,
+      "end_junction_id": 17,
+      "direction": "down",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 71.0,
+        "width": 21.0,
+        "height": 258.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 710.5,
+            "y": 71.0
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_11_to_19_left",
+      "start_junction_id": 11,
+      "end_junction_id": 19,
+      "direction": "left",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 619.5,
+        "y": 638.5,
+        "width": 257.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 326.0,
+            "y": 641.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_11_to_20_right",
+      "start_junction_id": 11,
+      "end_junction_id": 20,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 480.5,
+        "y": 638.5,
+        "width": 139.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 583.0,
+            "y": 641.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_12_to_53_left",
+      "start_junction_id": 12,
+      "end_junction_id": 53,
+      "direction": "left",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 10.5,
+        "y": 409.9166666666667,
+        "width": 112.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "polygon_id": "wall_polygon_6",
+          "original_coords": {
+            "x": 1080.0,
+            "y": 404.5
+          },
+          "alignment_type": "polygon",
+          "relationship_scores": [
+            {
+              "polygon_id": "wall_polygon_6",
+              "relationship_type": "inside",
+              "score": 100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_14_to_edge_left",
+      "start_junction_id": 14,
+      "end_junction_id": 63,
+      "direction": "left",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 10.5,
+        "y": 638.5,
+        "width": 354.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 838.0,
+            "y": 640.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_15_to_16_right",
+      "start_junction_id": 15,
+      "end_junction_id": 16,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 479.5,
+        "y": 884.5,
+        "width": 138.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "window_5",
+          "original_coords": {
+            "x": 585.0,
+            "y": 886.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_16_to_edge_up",
+      "start_junction_id": 16,
+      "end_junction_id": 64,
+      "direction": "up",
+      "orientation": "vertical",
+      "bbox": {
+        "x": 472.0,
+        "y": 817.0,
+        "width": 21.0,
+        "height": 80.0,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_4",
+          "original_coords": {
+            "x": 712.5,
+            "y": 817.0
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_18_to_13_right",
+      "start_junction_id": 18,
+      "end_junction_id": 13,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 481.5,
+        "y": 447.5,
+        "width": 395.0,
+        "height": 21.0,
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "segment_id": "wall_junction_56_to_57_right",
+      "start_junction_id": 56,
+      "end_junction_id": 57,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 286.5,
+        "y": 638.5,
+        "width": 25.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 891.0,
+            "y": 629.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_57_to_58_right",
+      "start_junction_id": 57,
+      "end_junction_id": 58,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 146.5,
+        "y": 638.5,
+        "width": 140.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 916.0,
+            "y": 629.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_58_to_60_right",
+      "start_junction_id": 58,
+      "end_junction_id": 60,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 125.5,
+        "y": 638.5,
+        "width": 21.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 1056.0,
+            "y": 629.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    },
+    {
+      "segment_id": "wall_junction_60_to_61_right",
+      "start_junction_id": 60,
+      "end_junction_id": 61,
+      "direction": "right",
+      "orientation": "horizontal",
+      "bbox": {
+        "x": 122.5,
+        "y": 638.5,
+        "width": 3.0,
+        "height": 21.0,
+        "orientation": "horizontal",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 1077.0,
+            "y": 627.5
+          },
+          "alignment_type": "opening"
+        }
+      }
+    }
+  ],
+  "openings": [
+    {
+      "id": "window_2",
+      "type": "window",
+      "bbox": {
+        "x": 81.5,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 22
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 30
+        }
+      ]
+    },
+    {
+      "id": "window_3",
+      "type": "window",
+      "bbox": {
+        "x": 649.5,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 21
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 29
+        }
+      ]
+    },
+    {
+      "id": "window_4",
+      "type": "window",
+      "bbox": {
+        "x": 723.5,
+        "y": 884.5,
+        "width": 92.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 27
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 34
+        }
+      ]
+    },
+    {
+      "id": "window_5",
+      "type": "window",
+      "bbox": {
+        "x": 356.5,
+        "y": 884.5,
+        "width": 92.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 26
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 33
+        }
+      ]
+    },
+    {
+      "id": "window_6",
+      "type": "window",
+      "bbox": {
+        "x": 1.5,
+        "y": 555.0,
+        "width": 21.0,
+        "height": 61.0
+      },
+      "orientation": "vertical",
+      "edge_junctions": [
+        {
+          "edge_side": "top",
+          "junction_id": 40
+        },
+        {
+          "edge_side": "bottom",
+          "junction_id": 48
+        }
+      ]
+    },
+    {
+      "id": "window_7",
+      "type": "window",
+      "bbox": {
+        "x": 1.5,
+        "y": 446.0,
+        "width": 21.0,
+        "height": 63.0
+      },
+      "orientation": "vertical",
+      "edge_junctions": [
+        {
+          "edge_side": "top",
+          "junction_id": 37
+        },
+        {
+          "edge_side": "bottom",
+          "junction_id": 44
+        }
+      ]
+    },
+    {
+      "id": "door_1",
+      "type": "door",
+      "bbox": {
+        "x": 472.0,
+        "y": 356.0,
+        "width": 21.0,
+        "height": 80.0
+      },
+      "orientation": "vertical",
+      "edge_junctions": [
+        {
+          "edge_side": "top",
+          "junction_id": 36
+        },
+        {
+          "edge_side": "bottom",
+          "junction_id": 42
+        }
+      ]
+    },
+    {
+      "id": "door_4",
+      "type": "door",
+      "bbox": {
+        "x": 472.0,
+        "y": 477.0,
+        "width": 21.0,
+        "height": 72.0
+      },
+      "orientation": "vertical",
+      "edge_junctions": [
+        {
+          "edge_side": "top",
+          "junction_id": 38
+        },
+        {
+          "edge_side": "bottom",
+          "junction_id": 47
+        }
+      ]
+    },
+    {
+      "id": "window_1",
+      "type": "window",
+      "bbox": {
+        "x": 46.5,
+        "y": 1000.5,
+        "width": 225.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 28
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 35
+        }
+      ]
+    },
+    {
+      "id": "window_8",
+      "type": "window",
+      "bbox": {
+        "x": 865.5,
+        "y": 486.0,
+        "width": 21.0,
+        "height": 63.0
+      },
+      "orientation": "vertical",
+      "edge_junctions": [
+        {
+          "edge_side": "top",
+          "junction_id": 39
+        },
+        {
+          "edge_side": "bottom",
+          "junction_id": 46
+        }
+      ]
+    },
+    {
+      "id": "door_2",
+      "type": "door",
+      "bbox": {
+        "x": 275.5,
+        "y": 318.0,
+        "width": 79.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 23
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 31
+        }
+      ]
+    },
+    {
+      "id": "door_3",
+      "type": "door",
+      "bbox": {
+        "x": 365.5,
+        "y": 638.5,
+        "width": 80.0,
+        "height": 21.0
+      },
+      "orientation": "horizontal",
+      "edge_junctions": [
+        {
+          "edge_side": "left",
+          "junction_id": 24
+        },
+        {
+          "edge_side": "right",
+          "junction_id": 32
+        }
+      ]
+    },
+    {
+      "id": "door_5",
+      "type": "door",
+      "bbox": {
+        "x": 609.0,
+        "y": 736.0,
+        "width": 21.0,
+        "height": 71.0
+      },
+      "orientation": "vertical",
+      "edge_junctions": [
+        {
+          "edge_side": "top",
+          "junction_id": 41
+        },
+        {
+          "edge_side": "bottom",
+          "junction_id": 49
+        }
+      ]
+    }
+  ],
+  "pillar_squares": [],
+  "statistics": {
+    "total_junctions": 64,
+    "total_wall_segments_from_openings": 52,
+    "total_wall_segments_from_junctions": 40,
+    "total_openings": 13,
+    "total_pillar_squares": 0,
+    "extended_segments": 11,
+    "has_building_outline": true,
+    "has_foundation": true,
+    "has_street": true
+  },
+  "building_outline": {
+    "id": "building_outline_1",
+    "type": "building_outline",
+    "vertices": [
+      {
+        "x": 875.5,
+        "y": 70.0,
+        "junction_name": "J6",
+        "junction_id": 6,
+        "junction_type": "window_left_corner",
+        "corner": 0
+      },
+      {
+        "x": 876.5,
+        "y": 458.0,
+        "junction_name": "J18",
+        "junction_id": 18,
+        "junction_type": "door_corner",
+        "corner": 0
+      },
+      {
+        "x": 875.5,
+        "y": 486.0,
+        "junction_name": "J39",
+        "junction_id": 39,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 875.5,
+        "y": 549.0,
+        "junction_name": "J46",
+        "junction_id": 46,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 876.5,
+        "y": 648.0,
+        "junction_name": "J19",
+        "junction_id": 19,
+        "junction_type": "door_corner",
+        "corner": 0
+      },
+      {
+        "x": 875.5,
+        "y": 895.0,
+        "junction_name": "J4",
+        "junction_id": 4,
+        "junction_type": "door_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 815.5,
+        "y": 895.0,
+        "junction_name": "J27",
+        "junction_id": 27,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 723.5,
+        "y": 896.0,
+        "junction_name": "J34",
+        "junction_id": 34,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 617.5,
+        "y": 897.0,
+        "junction_name": "J15",
+        "junction_id": 15,
+        "junction_type": "wall_junction_l",
+        "corner": 0
+      },
+      {
+        "x": 479.5,
+        "y": 897.0,
+        "junction_name": "J16",
+        "junction_id": 16,
+        "junction_type": "wall_junction_l",
+        "corner": 0
+      },
+      {
+        "x": 448.5,
+        "y": 894.0,
+        "junction_name": "J26",
+        "junction_id": 26,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 356.5,
+        "y": 895.0,
+        "junction_name": "J33",
+        "junction_id": 33,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 304.5,
+        "y": 895.0,
+        "junction_name": "J9",
+        "junction_id": 9,
+        "junction_type": "window_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 303.5,
+        "y": 1012.0,
+        "junction_name": "J5",
+        "junction_id": 5,
+        "junction_type": "door_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 271.5,
+        "y": 1012.0,
+        "junction_name": "J28",
+        "junction_id": 28,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 46.5,
+        "y": 1012.0,
+        "junction_name": "J35",
+        "junction_id": 35,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 10.5,
+        "y": 1012.0,
+        "junction_name": "J2",
+        "junction_id": 2,
+        "junction_type": "door_left_corner",
+        "corner": 1
+      },
+      {
+        "x": 10.5,
+        "y": 651.0,
+        "junction_name": "J14",
+        "junction_id": 14,
+        "junction_type": "wall_junction_cross",
+        "corner": 0
+      },
+      {
+        "x": 10.5,
+        "y": 616.0,
+        "junction_name": "J48",
+        "junction_id": 48,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 11.5,
+        "y": 555.0,
+        "junction_name": "J40",
+        "junction_id": 40,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 10.5,
+        "y": 509.0,
+        "junction_name": "J44",
+        "junction_id": 44,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 11.5,
+        "y": 446.0,
+        "junction_name": "J37",
+        "junction_id": 37,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 10.5,
+        "y": 415.0,
+        "junction_name": "J12",
+        "junction_id": 12,
+        "junction_type": "wall_junction_cross",
+        "corner": 0
+      },
+      {
+        "x": 11.5,
+        "y": 70.0,
+        "junction_name": "J7",
+        "junction_id": 7,
+        "junction_type": "window_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 81.5,
+        "y": 70.0,
+        "junction_name": "J30",
+        "junction_id": 30,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 236.5,
+        "y": 70.0,
+        "junction_name": "J22",
+        "junction_id": 22,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 481.5,
+        "y": 71.0,
+        "junction_name": "J10",
+        "junction_id": 10,
+        "junction_type": "wall_junction_t",
+        "corner": 0
+      },
+      {
+        "x": 649.5,
+        "y": 70.0,
+        "junction_name": "J29",
+        "junction_id": 29,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 804.5,
+        "y": 70.0,
+        "junction_name": "J21",
+        "junction_id": 21,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 875.5,
+        "y": 70.0,
+        "junction_name": "J6",
+        "junction_id": 6,
+        "junction_type": "window_left_corner",
+        "corner": 1
+      }
+    ],
+    "area": 748316.5,
+    "perimeter": 3612.240488863607,
+    "num_vertices": 30,
+    "source": "junction_contour_fixed"
+  },
+  "foundation": {
+    "id": "foundation_1",
+    "type": "foundation",
+    "vertices": [
+      {
+        "x": 884.5,
+        "y": 62.0
+      },
+      {
+        "x": 4.5,
+        "y": 62.0
+      },
+      {
+        "x": 4.5,
+        "y": 1020.0
+      },
+      {
+        "x": 884.5,
+        "y": 1020.0
+      }
+    ],
+    "area": 843040.0,
+    "perimeter": 3676.0,
+    "num_vertices": 4,
+    "source": "building_extremes"
+  },
+  "street": {
+    "id": "street_1",
+    "junction_id": "6",
+    "junction": {
+      "x": 875.5,
+      "y": 70.0
+    },
+    "street_point": {
+      "x": 875.5,
+      "y": 38.810508254885015
+    },
+    "home_point": {
+      "x": 875.5,
+      "y": 101.18949174511499
+    },
+    "wall_thickness": 15.594745872557493,
+    "distance_to_foundation": 23.189491745114985
+  }
+}

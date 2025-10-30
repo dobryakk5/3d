@@ -3996,11 +3996,24 @@ if __name__ == "__main__":
         print("АВТОМАТИЧЕСКИЙ ЗАПУСК СОЗДАНИЯ 3D СТЕН")
         print("=" * 60)
         
-        # Путь к файлу с координатами стен
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(script_dir, "wall_coordinates_inverted.json")
+        # Читаем путь к файлу с координатами стен из аргументов командной строки
+        json_path = None
+        for i, a in enumerate(sys.argv):
+            if a == "--json" and i + 1 < len(sys.argv):
+                json_path = sys.argv[i + 1]
+                break
+            if a.startswith("--json="):
+                json_path = a.split("=", 1)[1]
+                break
+        if not json_path:
+            print("Ошибка: не указан путь к JSON файлу. Использование: --json <path/to/<prefix>_wall_coordinates_inverted.json>")
+            sys.exit(1)
+        if not os.path.exists(json_path):
+            print(f"Ошибка: файл не найден: {json_path}")
+            sys.exit(1)
         
         # Путь к текстуре кирпича (опционально)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
         brick_texture_path = os.path.join(script_dir, "brick_texture.jpg")
         
         # Создаем 3D стены с указанной высотой и текстурой кирпича для внешних стен

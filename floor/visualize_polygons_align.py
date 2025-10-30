@@ -733,10 +733,53 @@ def main():
     print("РЕШЕНИЕ ПРОБЛЕМЫ J18-J25 - ВЫРАВНИВАНИЕ ПРОЕМОВ")
     print("="*60)
     
+    # Проверяем аргументы командной строки
+    if len(sys.argv) > 1:
+        input_file = sys.argv[1]
+        # Перезаписываем тот же файл (in-place)
+        output_file = input_file
+        print(f"Используем входной файл: {input_file}")
+        print(f"Выходной файл (перезапись): {output_file}")
+    else:
+        # Используем файлы по умолчанию (in-place)
+        input_file = 'plan_floor1_objects.json'
+        output_file = 'plan_floor1_objects.json'
+        print(f"Используем файл по умолчанию: {input_file}")
+    
     # Шаг 1: Загрузка данных
     print("\n1. Загрузка данных...")
-    with open('plan_floor1_objects.json', 'r') as f:
-        data = json.load(f)
+    try:
+        # Используем io для чтения файла
+        import io
+        
+        # Открываем файл в бинарном режиме
+        with open(input_file, 'rb') as f:
+            raw_data = f.read()
+        
+        # Пробуем декодировать как UTF-8
+        try:
+            text_data = raw_data.decode('utf-8')
+            data = json.loads(text_data)
+            print(f"  ✓ Файл загружен с кодировкой: UTF-8")
+        except UnicodeDecodeError:
+            # Пробуем другие кодировки
+            encodings = ['latin-1', 'cp1252', 'iso-8859-1']
+            for encoding in encodings:
+                try:
+                    text_data = raw_data.decode(encoding)
+                    data = json.loads(text_data)
+                    print(f"  ✓ Файл загружен с кодировкой: {encoding}")
+                    break
+                except Exception:
+                    continue
+            else:
+                print(f"  ✗ Не удалось загрузить файл с поддерживаемыми кодировками")
+                raise
+    except Exception as e:
+        print(f"  ✗ Ошибка загрузки файла: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     # Шаг 2: Нормализация толщины проемов
     data = normalize_opening_thickness(data)
@@ -747,7 +790,7 @@ def main():
     
     # Шаг 4: Сохранение выравненных данных
     print("\n4. Сохранение выравненных данных...")
-    with open('plan_floor1_objects.json', 'w') as f:
+    with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(aligned_data, f, indent=2)
     
     # Шаг 5: Проверка результатов выравнивания проемов
@@ -783,7 +826,7 @@ def main():
     print("\n" + "="*60)
     print("РЕЗУЛЬТАТЫ:")
     print(f"  ✓ Выровнено {aligned_count} горизонтальных стен по проемам")
-    print("  ✓ Данные сохранены в plan_floor1_objects.json")
+    print(f"  ✓ Данные сохранены в {output_file}")
     print("="*60)
     
     print("\n✓ Проблема J18-J25 решена!")

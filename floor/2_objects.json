@@ -1,0 +1,2830 @@
+{
+  "metadata": {
+    "source_image": "../floor/2.jpg",
+    "scale_factor": 0.4126536369131574,
+    "units": "pixels",
+    "wall_height": 3.0,
+    "wall_thickness": 0.2,
+    "door_height": 2.1,
+    "window_height": 1.5,
+    "window_sill_height": 1.0,
+    "timestamp": "2025-10-30T13:43:00.940840",
+    "model_info": {
+      "name": "hg_furukawa_original",
+      "weights": "model_best_val_loss_var.pkl"
+    }
+  },
+  "walls": [
+    {
+      "id": "wall_1",
+      "start": {
+        "x": 600.0,
+        "y": 656.0
+      },
+      "end": {
+        "x": 707.0,
+        "y": 656.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_2",
+      "start": {
+        "x": 590.0,
+        "y": 880.0
+      },
+      "end": {
+        "x": 591.0,
+        "y": 663.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_3",
+      "start": {
+        "x": 707.0,
+        "y": 887.0
+      },
+      "end": {
+        "x": 595.0,
+        "y": 885.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_4",
+      "start": {
+        "x": 713.0,
+        "y": 818.0
+      },
+      "end": {
+        "x": 714.0,
+        "y": 880.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_5",
+      "start": {
+        "x": 727.0,
+        "y": 880.0
+      },
+      "end": {
+        "x": 727.0,
+        "y": 820.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_6",
+      "start": {
+        "x": 904.0,
+        "y": 886.0
+      },
+      "end": {
+        "x": 734.0,
+        "y": 886.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_7",
+      "start": {
+        "x": 905.0,
+        "y": 996.0
+      },
+      "end": {
+        "x": 904.0,
+        "y": 886.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_8",
+      "start": {
+        "x": 1085.0,
+        "y": 1006.0
+      },
+      "end": {
+        "x": 911.0,
+        "y": 1002.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_9",
+      "start": {
+        "x": 1168.0,
+        "y": 1004.0
+      },
+      "end": {
+        "x": 1085.0,
+        "y": 1006.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_10",
+      "start": {
+        "x": 574.0,
+        "y": 660.0
+      },
+      "end": {
+        "x": 576.0,
+        "y": 879.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_11",
+      "start": {
+        "x": 343.0,
+        "y": 656.0
+      },
+      "end": {
+        "x": 568.0,
+        "y": 655.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_12",
+      "start": {
+        "x": 335.0,
+        "y": 880.0
+      },
+      "end": {
+        "x": 334.0,
+        "y": 664.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_13",
+      "start": {
+        "x": 569.0,
+        "y": 887.0
+      },
+      "end": {
+        "x": 341.0,
+        "y": 886.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_14",
+      "start": {
+        "x": 713.0,
+        "y": 665.0
+      },
+      "end": {
+        "x": 713.0,
+        "y": 716.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_15",
+      "start": {
+        "x": 727.0,
+        "y": 719.0
+      },
+      "end": {
+        "x": 728.0,
+        "y": 667.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_16",
+      "start": {
+        "x": 761.0,
+        "y": 337.0
+      },
+      "end": {
+        "x": 934.0,
+        "y": 339.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_17",
+      "start": {
+        "x": 940.0,
+        "y": 349.0
+      },
+      "end": {
+        "x": 938.0,
+        "y": 419.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_18",
+      "start": {
+        "x": 943.0,
+        "y": 424.0
+      },
+      "end": {
+        "x": 1177.0,
+        "y": 422.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_19",
+      "start": {
+        "x": 1182.0,
+        "y": 427.0
+      },
+      "end": {
+        "x": 1182.0,
+        "y": 636.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_20",
+      "start": {
+        "x": 1173.0,
+        "y": 642.0
+      },
+      "end": {
+        "x": 1047.0,
+        "y": 644.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_21",
+      "start": {
+        "x": 1047.0,
+        "y": 644.0
+      },
+      "end": {
+        "x": 735.0,
+        "y": 640.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_22",
+      "start": {
+        "x": 729.0,
+        "y": 634.0
+      },
+      "end": {
+        "x": 727.0,
+        "y": 433.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_23",
+      "start": {
+        "x": 727.0,
+        "y": 433.0
+      },
+      "end": {
+        "x": 728.0,
+        "y": 346.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_24",
+      "start": {
+        "x": 856.0,
+        "y": 78.0
+      },
+      "end": {
+        "x": 1175.0,
+        "y": 78.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_25",
+      "start": {
+        "x": 1182.0,
+        "y": 84.0
+      },
+      "end": {
+        "x": 1183.0,
+        "y": 397.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_26",
+      "start": {
+        "x": 1174.0,
+        "y": 407.0
+      },
+      "end": {
+        "x": 964.0,
+        "y": 407.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_27",
+      "start": {
+        "x": 956.0,
+        "y": 401.0
+      },
+      "end": {
+        "x": 954.0,
+        "y": 321.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_28",
+      "start": {
+        "x": 954.0,
+        "y": 321.0
+      },
+      "end": {
+        "x": 733.0,
+        "y": 320.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_29",
+      "start": {
+        "x": 318.0,
+        "y": 62.0
+      },
+      "end": {
+        "x": 319.0,
+        "y": 902.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_30",
+      "start": {
+        "x": 1197.0,
+        "y": 63.0
+      },
+      "end": {
+        "x": 319.0,
+        "y": 62.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_31",
+      "start": {
+        "x": 1198.0,
+        "y": 1017.0
+      },
+      "end": {
+        "x": 1197.0,
+        "y": 63.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_32",
+      "start": {
+        "x": 892.0,
+        "y": 1018.0
+      },
+      "end": {
+        "x": 1193.0,
+        "y": 1020.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_33",
+      "start": {
+        "x": 889.0,
+        "y": 911.0
+      },
+      "end": {
+        "x": 892.0,
+        "y": 1018.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    },
+    {
+      "id": "wall_34",
+      "start": {
+        "x": 319.0,
+        "y": 902.0
+      },
+      "end": {
+        "x": 880.0,
+        "y": 902.0
+      },
+      "thickness": 0.2,
+      "height": 3.0,
+      "source": "DL"
+    }
+  ],
+  "wall_polygons": [
+    {
+      "id": "wall_polygon_1",
+      "vertices": [
+        {
+          "x": 853.0,
+          "y": 886.0
+        },
+        {
+          "x": 848.0,
+          "y": 891.0
+        },
+        {
+          "x": 845.0,
+          "y": 904.0
+        },
+        {
+          "x": 879.0,
+          "y": 905.0
+        },
+        {
+          "x": 888.0,
+          "y": 910.0
+        },
+        {
+          "x": 886.0,
+          "y": 1018.0
+        },
+        {
+          "x": 893.0,
+          "y": 1022.0
+        },
+        {
+          "x": 922.0,
+          "y": 1022.0
+        },
+        {
+          "x": 933.0,
+          "y": 1011.0
+        },
+        {
+          "x": 931.0,
+          "y": 1003.0
+        },
+        {
+          "x": 913.0,
+          "y": 1002.0
+        },
+        {
+          "x": 902.0,
+          "y": 991.0
+        },
+        {
+          "x": 901.0,
+          "y": 982.0
+        },
+        {
+          "x": 902.0,
+          "y": 970.0
+        },
+        {
+          "x": 907.0,
+          "y": 964.0
+        },
+        {
+          "x": 908.0,
+          "y": 887.0
+        },
+        {
+          "x": 901.0,
+          "y": 884.0
+        }
+      ],
+      "area": 3861.5,
+      "perimeter": 458.1492758989334,
+      "num_vertices": 17,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_2",
+      "vertices": [
+        {
+          "x": 479.0,
+          "y": 905.0
+        },
+        {
+          "x": 747.0,
+          "y": 906.0
+        },
+        {
+          "x": 755.0,
+          "y": 898.0
+        },
+        {
+          "x": 755.0,
+          "y": 885.0
+        },
+        {
+          "x": 738.0,
+          "y": 886.0
+        },
+        {
+          "x": 731.0,
+          "y": 881.0
+        },
+        {
+          "x": 731.0,
+          "y": 817.0
+        },
+        {
+          "x": 719.0,
+          "y": 817.0
+        },
+        {
+          "x": 711.0,
+          "y": 824.0
+        },
+        {
+          "x": 711.0,
+          "y": 878.0
+        },
+        {
+          "x": 704.0,
+          "y": 885.0
+        },
+        {
+          "x": 602.0,
+          "y": 886.0
+        },
+        {
+          "x": 593.0,
+          "y": 879.0
+        },
+        {
+          "x": 594.0,
+          "y": 808.0
+        },
+        {
+          "x": 582.0,
+          "y": 807.0
+        },
+        {
+          "x": 574.0,
+          "y": 815.0
+        },
+        {
+          "x": 574.0,
+          "y": 878.0
+        },
+        {
+          "x": 567.0,
+          "y": 885.0
+        },
+        {
+          "x": 486.0,
+          "y": 885.0
+        },
+        {
+          "x": 480.0,
+          "y": 891.0
+        }
+      ],
+      "area": 8398.5,
+      "perimeter": 908.8010770082474,
+      "num_vertices": 20,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_3",
+      "vertices": [
+        {
+          "x": 837.0,
+          "y": 652.0
+        },
+        {
+          "x": 837.0,
+          "y": 656.0
+        },
+        {
+          "x": 842.0,
+          "y": 659.0
+        },
+        {
+          "x": 1170.0,
+          "y": 658.0
+        },
+        {
+          "x": 1181.0,
+          "y": 662.0
+        },
+        {
+          "x": 1180.0,
+          "y": 963.0
+        },
+        {
+          "x": 1186.0,
+          "y": 973.0
+        },
+        {
+          "x": 1187.0,
+          "y": 988.0
+        },
+        {
+          "x": 1180.0,
+          "y": 999.0
+        },
+        {
+          "x": 1175.0,
+          "y": 1002.0
+        },
+        {
+          "x": 1164.0,
+          "y": 1002.0
+        },
+        {
+          "x": 1156.0,
+          "y": 1013.0
+        },
+        {
+          "x": 1157.0,
+          "y": 1022.0
+        },
+        {
+          "x": 1188.0,
+          "y": 1023.0
+        },
+        {
+          "x": 1201.0,
+          "y": 1010.0
+        },
+        {
+          "x": 1200.0,
+          "y": 620.0
+        },
+        {
+          "x": 1197.0,
+          "y": 617.0
+        },
+        {
+          "x": 1188.0,
+          "y": 620.0
+        },
+        {
+          "x": 1180.0,
+          "y": 630.0
+        },
+        {
+          "x": 1180.0,
+          "y": 637.0
+        },
+        {
+          "x": 1175.0,
+          "y": 641.0
+        },
+        {
+          "x": 1147.0,
+          "y": 638.0
+        },
+        {
+          "x": 851.0,
+          "y": 638.0
+        }
+      ],
+      "area": 15201.0,
+      "perimeter": 1674.9747388362885,
+      "num_vertices": 23,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_4",
+      "vertices": [
+        {
+          "x": 317.0,
+          "y": 903.0
+        },
+        {
+          "x": 323.0,
+          "y": 906.0
+        },
+        {
+          "x": 382.0,
+          "y": 905.0
+        },
+        {
+          "x": 388.0,
+          "y": 899.0
+        },
+        {
+          "x": 389.0,
+          "y": 885.0
+        },
+        {
+          "x": 354.0,
+          "y": 886.0
+        },
+        {
+          "x": 342.0,
+          "y": 884.0
+        },
+        {
+          "x": 337.0,
+          "y": 880.0
+        },
+        {
+          "x": 337.0,
+          "y": 663.0
+        },
+        {
+          "x": 342.0,
+          "y": 658.0
+        },
+        {
+          "x": 569.0,
+          "y": 658.0
+        },
+        {
+          "x": 574.0,
+          "y": 663.0
+        },
+        {
+          "x": 574.0,
+          "y": 736.0
+        },
+        {
+          "x": 587.0,
+          "y": 736.0
+        },
+        {
+          "x": 594.0,
+          "y": 729.0
+        },
+        {
+          "x": 593.0,
+          "y": 666.0
+        },
+        {
+          "x": 599.0,
+          "y": 658.0
+        },
+        {
+          "x": 706.0,
+          "y": 657.0
+        },
+        {
+          "x": 711.0,
+          "y": 663.0
+        },
+        {
+          "x": 711.0,
+          "y": 722.0
+        },
+        {
+          "x": 713.0,
+          "y": 726.0
+        },
+        {
+          "x": 725.0,
+          "y": 724.0
+        },
+        {
+          "x": 731.0,
+          "y": 711.0
+        },
+        {
+          "x": 731.0,
+          "y": 671.0
+        },
+        {
+          "x": 722.0,
+          "y": 673.0
+        },
+        {
+          "x": 720.0,
+          "y": 670.0
+        },
+        {
+          "x": 731.0,
+          "y": 658.0
+        },
+        {
+          "x": 746.0,
+          "y": 660.0
+        },
+        {
+          "x": 757.0,
+          "y": 649.0
+        },
+        {
+          "x": 755.0,
+          "y": 638.0
+        },
+        {
+          "x": 737.0,
+          "y": 640.0
+        },
+        {
+          "x": 730.0,
+          "y": 633.0
+        },
+        {
+          "x": 731.0,
+          "y": 561.0
+        },
+        {
+          "x": 717.0,
+          "y": 568.0
+        },
+        {
+          "x": 710.0,
+          "y": 578.0
+        },
+        {
+          "x": 711.0,
+          "y": 630.0
+        },
+        {
+          "x": 704.0,
+          "y": 638.0
+        },
+        {
+          "x": 345.0,
+          "y": 639.0
+        },
+        {
+          "x": 337.0,
+          "y": 634.0
+        },
+        {
+          "x": 337.0,
+          "y": 552.0
+        },
+        {
+          "x": 333.0,
+          "y": 549.0
+        },
+        {
+          "x": 324.0,
+          "y": 552.0
+        },
+        {
+          "x": 317.0,
+          "y": 560.0
+        },
+        {
+          "x": 316.0,
+          "y": 579.0
+        }
+      ],
+      "area": 20700.5,
+      "perimeter": 2212.8153579235077,
+      "num_vertices": 44,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_5",
+      "vertices": [
+        {
+          "x": 1196.0,
+          "y": 508.0
+        },
+        {
+          "x": 1191.0,
+          "y": 508.0
+        },
+        {
+          "x": 1179.0,
+          "y": 520.0
+        },
+        {
+          "x": 1180.0,
+          "y": 551.0
+        },
+        {
+          "x": 1184.0,
+          "y": 555.0
+        },
+        {
+          "x": 1190.0,
+          "y": 554.0
+        },
+        {
+          "x": 1201.0,
+          "y": 542.0
+        },
+        {
+          "x": 1201.0,
+          "y": 511.0
+        }
+      ],
+      "area": 833.5,
+      "perimeter": 122.32590126991272,
+      "num_vertices": 8,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_6",
+      "vertices": [
+        {
+          "x": 1201.0,
+          "y": 64.0
+        },
+        {
+          "x": 1186.0,
+          "y": 60.0
+        },
+        {
+          "x": 1127.0,
+          "y": 61.0
+        },
+        {
+          "x": 1120.0,
+          "y": 68.0
+        },
+        {
+          "x": 1120.0,
+          "y": 81.0
+        },
+        {
+          "x": 1175.0,
+          "y": 81.0
+        },
+        {
+          "x": 1181.0,
+          "y": 85.0
+        },
+        {
+          "x": 1180.0,
+          "y": 400.0
+        },
+        {
+          "x": 1174.0,
+          "y": 405.0
+        },
+        {
+          "x": 962.0,
+          "y": 406.0
+        },
+        {
+          "x": 958.0,
+          "y": 396.0
+        },
+        {
+          "x": 959.0,
+          "y": 324.0
+        },
+        {
+          "x": 955.0,
+          "y": 318.0
+        },
+        {
+          "x": 942.0,
+          "y": 319.0
+        },
+        {
+          "x": 928.0,
+          "y": 333.0
+        },
+        {
+          "x": 928.0,
+          "y": 337.0
+        },
+        {
+          "x": 938.0,
+          "y": 346.0
+        },
+        {
+          "x": 938.0,
+          "y": 418.0
+        },
+        {
+          "x": 941.0,
+          "y": 425.0
+        },
+        {
+          "x": 1163.0,
+          "y": 426.0
+        },
+        {
+          "x": 1170.0,
+          "y": 423.0
+        },
+        {
+          "x": 1179.0,
+          "y": 427.0
+        },
+        {
+          "x": 1183.0,
+          "y": 448.0
+        },
+        {
+          "x": 1198.0,
+          "y": 438.0
+        },
+        {
+          "x": 1201.0,
+          "y": 433.0
+        }
+      ],
+      "area": 15674.0,
+      "perimeter": 1683.8620411157608,
+      "num_vertices": 25,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_7",
+      "vertices": [
+        {
+          "x": 550.0,
+          "y": 72.0
+        },
+        {
+          "x": 553.0,
+          "y": 81.0
+        },
+        {
+          "x": 706.0,
+          "y": 80.0
+        },
+        {
+          "x": 709.0,
+          "y": 83.0
+        },
+        {
+          "x": 711.0,
+          "y": 353.0
+        },
+        {
+          "x": 720.0,
+          "y": 356.0
+        },
+        {
+          "x": 737.0,
+          "y": 339.0
+        },
+        {
+          "x": 828.0,
+          "y": 340.0
+        },
+        {
+          "x": 838.0,
+          "y": 339.0
+        },
+        {
+          "x": 847.0,
+          "y": 330.0
+        },
+        {
+          "x": 846.0,
+          "y": 319.0
+        },
+        {
+          "x": 737.0,
+          "y": 320.0
+        },
+        {
+          "x": 731.0,
+          "y": 313.0
+        },
+        {
+          "x": 731.0,
+          "y": 86.0
+        },
+        {
+          "x": 741.0,
+          "y": 80.0
+        },
+        {
+          "x": 958.0,
+          "y": 82.0
+        },
+        {
+          "x": 968.0,
+          "y": 73.0
+        },
+        {
+          "x": 966.0,
+          "y": 61.0
+        },
+        {
+          "x": 597.0,
+          "y": 60.0
+        },
+        {
+          "x": 560.0,
+          "y": 61.0
+        }
+      ],
+      "area": 16196.5,
+      "perimeter": 1710.5655771493912,
+      "num_vertices": 20,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    },
+    {
+      "id": "wall_polygon_8",
+      "vertices": [
+        {
+          "x": 321.0,
+          "y": 62.0
+        },
+        {
+          "x": 317.0,
+          "y": 67.0
+        },
+        {
+          "x": 316.0,
+          "y": 464.0
+        },
+        {
+          "x": 317.0,
+          "y": 482.0
+        },
+        {
+          "x": 320.0,
+          "y": 487.0
+        },
+        {
+          "x": 326.0,
+          "y": 486.0
+        },
+        {
+          "x": 336.0,
+          "y": 476.0
+        },
+        {
+          "x": 340.0,
+          "y": 464.0
+        },
+        {
+          "x": 376.0,
+          "y": 468.0
+        },
+        {
+          "x": 705.0,
+          "y": 466.0
+        },
+        {
+          "x": 714.0,
+          "y": 478.0
+        },
+        {
+          "x": 721.0,
+          "y": 475.0
+        },
+        {
+          "x": 731.0,
+          "y": 464.0
+        },
+        {
+          "x": 731.0,
+          "y": 442.0
+        },
+        {
+          "x": 727.0,
+          "y": 437.0
+        },
+        {
+          "x": 723.0,
+          "y": 437.0
+        },
+        {
+          "x": 713.0,
+          "y": 446.0
+        },
+        {
+          "x": 694.0,
+          "y": 448.0
+        },
+        {
+          "x": 343.0,
+          "y": 447.0
+        },
+        {
+          "x": 338.0,
+          "y": 443.0
+        },
+        {
+          "x": 337.0,
+          "y": 84.0
+        },
+        {
+          "x": 339.0,
+          "y": 81.0
+        },
+        {
+          "x": 392.0,
+          "y": 82.0
+        },
+        {
+          "x": 398.0,
+          "y": 77.0
+        },
+        {
+          "x": 400.0,
+          "y": 70.0
+        },
+        {
+          "x": 399.0,
+          "y": 61.0
+        }
+      ],
+      "area": 17956.0,
+      "perimeter": 1906.7493418455124,
+      "num_vertices": 26,
+      "source": "hatching",
+      "type": "wall",
+      "classification_reason": "near_opening"
+    }
+  ],
+  "pillar_polygons": [],
+  "openings": [
+    {
+      "id": "window_2",
+      "type": "window",
+      "bbox": {
+        "x": 966.0,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_30",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 22,
+          "junction_name": "J22",
+          "junction_type": "wall_intersection",
+          "x": 966.0,
+          "y": 70.0,
+          "distance": 1.0
+        },
+        "right": {
+          "junction_id": 30,
+          "junction_name": "J30",
+          "junction_type": "wall_end",
+          "x": 1121.0,
+          "y": 70.0,
+          "distance": 1.0
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9952861666679382,
+        "door_prob": 0.0006819217815063894
+      },
+      "original_bbox": {
+        "x": 966.0,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "aligned_bbox": {
+        "x": 966.0,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "alignment_offset": 0.0
+    },
+    {
+      "id": "window_3",
+      "type": "window",
+      "bbox": {
+        "x": 397.0,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_30",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 21,
+          "junction_name": "J21",
+          "junction_type": "wall_intersection",
+          "x": 398.0,
+          "y": 70.0,
+          "distance": 1.0
+        },
+        "right": {
+          "junction_id": 29,
+          "junction_name": "J29",
+          "junction_type": "wall_end",
+          "x": 553.0,
+          "y": 70.0,
+          "distance": 1.0
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9958556294441223,
+        "door_prob": 0.0009600738412700593
+      },
+      "original_bbox": {
+        "x": 397.0,
+        "y": 59.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "aligned_bbox": {
+        "x": 397.0,
+        "y": 58.5,
+        "width": 155.0,
+        "height": 21.0
+      },
+      "alignment_offset": -1.0
+    },
+    {
+      "id": "window_4",
+      "type": "window",
+      "bbox": {
+        "x": 387.0,
+        "y": 884.5,
+        "width": 93.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_34",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 27,
+          "junction_name": "J27",
+          "junction_type": "wall_intersection",
+          "x": 387.0,
+          "y": 895.0,
+          "distance": 0.5
+        },
+        "right": {
+          "junction_id": 34,
+          "junction_name": "J34",
+          "junction_type": "wall_end",
+          "x": 479.0,
+          "y": 896.0,
+          "distance": 1.118033988749895
+        },
+        "up": {
+          "junction_id": 34,
+          "junction_name": "J34",
+          "junction_type": "wall_end",
+          "x": 479.0,
+          "y": 896.0,
+          "distance": 47.055817918722866
+        },
+        "down": {
+          "junction_id": 34,
+          "junction_name": "J34",
+          "junction_type": "wall_end",
+          "x": 479.0,
+          "y": 896.0,
+          "distance": 46.810789354592174
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9939159750938416,
+        "door_prob": 0.003922097850590944
+      },
+      "original_bbox": {
+        "x": 387.0,
+        "y": 885.0,
+        "width": 93.0,
+        "height": 21.0
+      },
+      "aligned_bbox": {
+        "x": 387.0,
+        "y": 884.5,
+        "width": 93.0,
+        "height": 21.0
+      },
+      "alignment_offset": -0.5
+    },
+    {
+      "id": "window_5",
+      "type": "window",
+      "bbox": {
+        "x": 753.0,
+        "y": 884.5,
+        "width": 94.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_34",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 26,
+          "junction_name": "J26",
+          "junction_type": "wall_intersection",
+          "x": 754.0,
+          "y": 894.0,
+          "distance": 1.4142135623730951
+        },
+        "right": {
+          "junction_id": 33,
+          "junction_name": "J33",
+          "junction_type": "wall_end",
+          "x": 846.0,
+          "y": 895.0,
+          "distance": 1.0
+        },
+        "up": {
+          "junction_id": 26,
+          "junction_name": "J26",
+          "junction_type": "wall_intersection",
+          "x": 754.0,
+          "y": 894.0,
+          "distance": 47.07440918375928
+        },
+        "down": {
+          "junction_id": 33,
+          "junction_name": "J33",
+          "junction_type": "wall_end",
+          "x": 846.0,
+          "y": 895.0,
+          "distance": 47.29693436154187
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9910593628883362,
+        "door_prob": 0.003953834995627403
+      },
+      "original_bbox": {
+        "x": 753.0,
+        "y": 884.5,
+        "width": 94.0,
+        "height": 21.0
+      },
+      "aligned_bbox": {
+        "x": 753.0,
+        "y": 884.5,
+        "width": 94.0,
+        "height": 21.0
+      },
+      "alignment_offset": 0.0
+    },
+    {
+      "id": "window_6",
+      "type": "window",
+      "bbox": {
+        "x": 1180.0,
+        "y": 553.0,
+        "width": 21.0,
+        "height": 64.0
+      },
+      "wall_id": "wall_31",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 40,
+          "junction_name": "J40",
+          "junction_type": "door_frame",
+          "x": 1191.0,
+          "y": 555.0,
+          "distance": 32.31098884280702
+        },
+        "right": {
+          "junction_id": 40,
+          "junction_name": "J40",
+          "junction_type": "door_frame",
+          "x": 1191.0,
+          "y": 555.0,
+          "distance": 31.953090617340916
+        },
+        "up": {
+          "junction_id": 40,
+          "junction_name": "J40",
+          "junction_type": "door_frame",
+          "x": 1191.0,
+          "y": 555.0,
+          "distance": 2.0615528128088303
+        },
+        "down": {
+          "junction_id": 48,
+          "junction_name": "J48",
+          "junction_type": "window_frame",
+          "x": 1192.0,
+          "y": 616.0,
+          "distance": 1.8027756377319946
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9828681945800781,
+        "door_prob": 0.006835055071860552
+      },
+      "original_bbox": {
+        "x": 1180.0,
+        "y": 553.0,
+        "width": 21.0,
+        "height": 64.0
+      },
+      "aligned_bbox": {
+        "x": 1180.0,
+        "y": 553.0,
+        "width": 21.0,
+        "height": 64.0
+      },
+      "alignment_offset": 0.0
+    },
+    {
+      "id": "window_7",
+      "type": "window",
+      "bbox": {
+        "x": 1180.0,
+        "y": 445.0,
+        "width": 21.0,
+        "height": 65.0
+      },
+      "wall_id": "wall_31",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 37,
+          "junction_name": "J37",
+          "junction_type": "door_frame",
+          "x": 1191.0,
+          "y": 446.0,
+          "distance": 33.36540124140574
+        },
+        "right": {
+          "junction_id": 44,
+          "junction_name": "J44",
+          "junction_type": "window_frame",
+          "x": 1192.0,
+          "y": 509.0,
+          "distance": 33.04920573932148
+        },
+        "up": {
+          "junction_id": 37,
+          "junction_name": "J37",
+          "junction_type": "door_frame",
+          "x": 1191.0,
+          "y": 446.0,
+          "distance": 1.0
+        },
+        "down": {
+          "junction_id": 44,
+          "junction_name": "J44",
+          "junction_type": "window_frame",
+          "x": 1192.0,
+          "y": 509.0,
+          "distance": 1.4142135623730951
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9826622009277344,
+        "door_prob": 0.005325955338776112
+      },
+      "original_bbox": {
+        "x": 1180.5,
+        "y": 445.0,
+        "width": 21.0,
+        "height": 65.0
+      },
+      "aligned_bbox": {
+        "x": 1180.0,
+        "y": 445.0,
+        "width": 21.0,
+        "height": 65.0
+      },
+      "alignment_offset": -0.5
+    },
+    {
+      "id": "door_1",
+      "type": "door",
+      "bbox": {
+        "x": 709.5,
+        "y": 356.0,
+        "width": 21.0,
+        "height": 80.0
+      },
+      "wall_id": "wall_23",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions",
+        "JunctionHalfThickness"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 42,
+          "junction_name": "J42",
+          "junction_type": "window_frame",
+          "x": 719.0,
+          "y": 435.0,
+          "distance": 40.26164427839479
+        },
+        "right": {
+          "junction_id": 36,
+          "junction_name": "J36",
+          "junction_type": "door_frame",
+          "x": 724.0,
+          "y": 356.0,
+          "distance": 40.607881008493905
+        },
+        "up": {
+          "junction_id": 36,
+          "junction_name": "J36",
+          "junction_type": "door_frame",
+          "x": 724.0,
+          "y": 356.0,
+          "distance": 4.0
+        },
+        "down": {
+          "junction_id": 42,
+          "junction_name": "J42",
+          "junction_type": "window_frame",
+          "x": 719.0,
+          "y": 435.0,
+          "distance": 1.4142135623730951
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9867868423461914,
+        "window_prob": 3.183143780915998e-05
+      },
+      "original_bbox": {
+        "x": 709.5,
+        "y": 356.0,
+        "width": 21.0,
+        "height": 80.0
+      },
+      "aligned_bbox": {
+        "x": 709.5,
+        "y": 356.0,
+        "width": 21.0,
+        "height": 80.0
+      },
+      "alignment_offset": 0.0
+    },
+    {
+      "id": "door_4",
+      "type": "door",
+      "bbox": {
+        "x": 709.5,
+        "y": 477.0,
+        "width": 21.0,
+        "height": 72.0
+      },
+      "wall_id": "wall_22",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions",
+        "JunctionHalfThickness"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 38,
+          "junction_name": "J38",
+          "junction_type": "door_frame",
+          "x": 721.0,
+          "y": 477.0,
+          "distance": 37.64306044943742
+        },
+        "right": {
+          "junction_id": 45,
+          "junction_name": "J45",
+          "junction_type": "window_frame",
+          "x": 724.0,
+          "y": 548.0,
+          "distance": 35.6931365951495
+        },
+        "up": {
+          "junction_id": 38,
+          "junction_name": "J38",
+          "junction_type": "door_frame",
+          "x": 721.0,
+          "y": 477.0,
+          "distance": 0.5
+        },
+        "down": {
+          "junction_id": 47,
+          "junction_name": "J47",
+          "junction_type": "window_frame",
+          "x": 721.0,
+          "y": 549.0,
+          "distance": 0.5
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9845390915870667,
+        "window_prob": 7.230943447211757e-05
+      },
+      "original_bbox": {
+        "x": 710.0,
+        "y": 477.0,
+        "width": 21.0,
+        "height": 72.0
+      },
+      "aligned_bbox": {
+        "x": 709.5,
+        "y": 477.0,
+        "width": 21.0,
+        "height": 72.0
+      },
+      "alignment_offset": -0.5
+    },
+    {
+      "id": "window_1",
+      "type": "window",
+      "bbox": {
+        "x": 931.0,
+        "y": 1000.5,
+        "width": 227.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_8",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 28,
+          "junction_name": "J28",
+          "junction_type": "wall_intersection",
+          "x": 931.0,
+          "y": 1012.0,
+          "distance": 1.0
+        },
+        "right": {
+          "junction_id": 35,
+          "junction_name": "J35",
+          "junction_type": "wall_end",
+          "x": 1156.0,
+          "y": 1012.0,
+          "distance": 2.23606797749979
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9072017669677734,
+        "door_prob": 0.0014520826516672969
+      }
+    },
+    {
+      "id": "window_8",
+      "type": "window",
+      "bbox": {
+        "x": 316.0,
+        "y": 487.0,
+        "width": 21.0,
+        "height": 63.0
+      },
+      "wall_id": "wall_29",
+      "height": 1.5,
+      "sill_height": 1.0,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 46,
+          "junction_name": "J46",
+          "junction_type": "window_frame",
+          "x": 327.0,
+          "y": 549.0,
+          "distance": 32.42298567374695
+        },
+        "right": {
+          "junction_id": 46,
+          "junction_name": "J46",
+          "junction_type": "window_frame",
+          "x": 327.0,
+          "y": 549.0,
+          "distance": 32.09750769140807
+        },
+        "up": {
+          "junction_id": 39,
+          "junction_name": "J39",
+          "junction_type": "door_frame",
+          "x": 327.0,
+          "y": 486.0,
+          "distance": 1.118033988749895
+        },
+        "down": {
+          "junction_id": 46,
+          "junction_name": "J46",
+          "junction_type": "window_frame",
+          "x": 327.0,
+          "y": 549.0,
+          "distance": 1.118033988749895
+        }
+      },
+      "confidence": {
+        "window_prob": 0.9817429780960083,
+        "door_prob": 0.007085553370416164
+      }
+    },
+    {
+      "id": "door_2",
+      "type": "door",
+      "bbox": {
+        "x": 847.0,
+        "y": 318.0,
+        "width": 80.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_28",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions",
+        "JunctionHalfThickness"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 23,
+          "junction_name": "J23",
+          "junction_type": "wall_intersection",
+          "x": 848.0,
+          "y": 330.0,
+          "distance": 1.8027756377319946
+        },
+        "right": {
+          "junction_id": 31,
+          "junction_name": "J31",
+          "junction_type": "wall_end",
+          "x": 927.0,
+          "y": 330.0,
+          "distance": 1.5
+        },
+        "up": {
+          "junction_id": 23,
+          "junction_name": "J23",
+          "junction_type": "wall_intersection",
+          "x": 848.0,
+          "y": 330.0,
+          "distance": 40.80441152620633
+        },
+        "down": {
+          "junction_id": 23,
+          "junction_name": "J23",
+          "junction_type": "wall_intersection",
+          "x": 848.0,
+          "y": 330.0,
+          "distance": 40.024992192379
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9902814626693726,
+        "window_prob": 0.0005093918880447745
+      }
+    },
+    {
+      "id": "door_3",
+      "type": "door",
+      "bbox": {
+        "x": 757.0,
+        "y": 638.5,
+        "width": 80.0,
+        "height": 21.0
+      },
+      "wall_id": "wall_21",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions",
+        "JunctionHalfThickness"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 24,
+          "junction_name": "J24",
+          "junction_type": "wall_intersection",
+          "x": 757.0,
+          "y": 649.0,
+          "distance": 0.0
+        },
+        "right": {
+          "junction_id": 32,
+          "junction_name": "J32",
+          "junction_type": "wall_end",
+          "x": 837.0,
+          "y": 649.0,
+          "distance": 0.0
+        },
+        "up": {
+          "junction_id": 25,
+          "junction_name": "J25",
+          "junction_type": "wall_intersection",
+          "x": 760.0,
+          "y": 650.0,
+          "distance": 38.897300677553446
+        },
+        "down": {
+          "junction_id": 25,
+          "junction_name": "J25",
+          "junction_type": "wall_intersection",
+          "x": 760.0,
+          "y": 650.0,
+          "distance": 38.3275357934736
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9942154288291931,
+        "window_prob": 0.0003859937423840165
+      }
+    },
+    {
+      "id": "door_5",
+      "type": "door",
+      "bbox": {
+        "x": 572.5,
+        "y": 736.0,
+        "width": 21.0,
+        "height": 71.0
+      },
+      "wall_id": "wall_2",
+      "height": 2.1,
+      "methods": [
+        "DL",
+        "Wall-aligned",
+        "Junctions",
+        "JunctionHalfThickness"
+      ],
+      "junctions": {
+        "left": {
+          "junction_id": 41,
+          "junction_name": "J41",
+          "junction_type": "door_frame",
+          "x": 584.0,
+          "y": 736.0,
+          "distance": 37.473323845103465
+        },
+        "right": {
+          "junction_id": 41,
+          "junction_name": "J41",
+          "junction_type": "door_frame",
+          "x": 584.0,
+          "y": 736.0,
+          "distance": 36.881567211820055
+        },
+        "up": {
+          "junction_id": 41,
+          "junction_name": "J41",
+          "junction_type": "door_frame",
+          "x": 584.0,
+          "y": 736.0,
+          "distance": 1.0
+        },
+        "down": {
+          "junction_id": 49,
+          "junction_name": "J49",
+          "junction_type": "window_frame",
+          "x": 584.0,
+          "y": 807.0,
+          "distance": 1.0
+        }
+      },
+      "confidence": {
+        "door_prob": 0.9926014542579651,
+        "window_prob": 0.0001052267398335971
+      }
+    }
+  ],
+  "pillars": [],
+  "rooms": [
+    {
+      "id": "room_1",
+      "vertices": [
+        {
+          "x": 318.0,
+          "y": 62.0
+        },
+        {
+          "x": 319.0,
+          "y": 62.0
+        }
+      ],
+      "wall_ids": [
+        "wall_1",
+        "wall_2",
+        "wall_3",
+        "wall_4",
+        "wall_5",
+        "wall_6",
+        "wall_7",
+        "wall_8",
+        "wall_9",
+        "wall_10",
+        "wall_11",
+        "wall_12",
+        "wall_13",
+        "wall_14",
+        "wall_15",
+        "wall_16",
+        "wall_17",
+        "wall_18",
+        "wall_19",
+        "wall_20",
+        "wall_21",
+        "wall_22",
+        "wall_23",
+        "wall_24",
+        "wall_25",
+        "wall_26",
+        "wall_27",
+        "wall_28",
+        "wall_29",
+        "wall_30",
+        "wall_31",
+        "wall_32",
+        "wall_33",
+        "wall_34"
+      ]
+    }
+  ],
+  "junctions": [
+    {
+      "x": 721.0,
+      "y": 723.0,
+      "type": "wall_corner_90deg",
+      "id": 1
+    },
+    {
+      "x": 1192.0,
+      "y": 1012.0,
+      "type": "door_left_corner",
+      "id": 2
+    },
+    {
+      "x": 947.0,
+      "y": 416.0,
+      "type": "door_right_corner",
+      "id": 3
+    },
+    {
+      "x": 327.0,
+      "y": 895.0,
+      "type": "door_right_corner",
+      "id": 4
+    },
+    {
+      "x": 899.0,
+      "y": 1012.0,
+      "type": "door_right_corner",
+      "id": 5
+    },
+    {
+      "x": 327.0,
+      "y": 70.0,
+      "type": "window_left_corner",
+      "id": 6
+    },
+    {
+      "x": 1191.0,
+      "y": 70.0,
+      "type": "window_right_corner",
+      "id": 7
+    },
+    {
+      "x": 947.0,
+      "y": 329.0,
+      "type": "window_right_corner",
+      "id": 8
+    },
+    {
+      "x": 898.0,
+      "y": 895.0,
+      "type": "window_right_corner",
+      "id": 9
+    },
+    {
+      "x": 721.0,
+      "y": 71.0,
+      "type": "wall_junction_t",
+      "id": 10
+    },
+    {
+      "x": 583.0,
+      "y": 652.0,
+      "type": "wall_junction_t",
+      "id": 11
+    },
+    {
+      "x": 1192.0,
+      "y": 415.0,
+      "type": "wall_junction_cross",
+      "id": 12
+    },
+    {
+      "x": 721.0,
+      "y": 459.0,
+      "type": "wall_junction_cross",
+      "id": 13
+    },
+    {
+      "x": 1192.0,
+      "y": 651.0,
+      "type": "wall_junction_cross",
+      "id": 14
+    },
+    {
+      "x": 585.0,
+      "y": 897.0,
+      "type": "wall_junction_l",
+      "id": 15
+    },
+    {
+      "x": 723.0,
+      "y": 897.0,
+      "type": "wall_junction_l",
+      "id": 16
+    },
+    {
+      "x": 722.0,
+      "y": 329.0,
+      "type": "door_corner",
+      "id": 17
+    },
+    {
+      "x": 326.0,
+      "y": 458.0,
+      "type": "door_corner",
+      "id": 18
+    },
+    {
+      "x": 326.0,
+      "y": 648.0,
+      "type": "door_corner",
+      "id": 19
+    },
+    {
+      "x": 722.0,
+      "y": 649.0,
+      "type": "window_corner",
+      "id": 20
+    },
+    {
+      "x": 398.0,
+      "y": 70.0,
+      "type": "wall_intersection",
+      "id": 21
+    },
+    {
+      "x": 966.0,
+      "y": 70.0,
+      "type": "wall_intersection",
+      "id": 22
+    },
+    {
+      "x": 848.0,
+      "y": 330.0,
+      "type": "wall_intersection",
+      "id": 23
+    },
+    {
+      "x": 757.0,
+      "y": 649.0,
+      "type": "wall_intersection",
+      "id": 24
+    },
+    {
+      "x": 760.0,
+      "y": 650.0,
+      "type": "wall_intersection",
+      "id": 25
+    },
+    {
+      "x": 754.0,
+      "y": 894.0,
+      "type": "wall_intersection",
+      "id": 26
+    },
+    {
+      "x": 387.0,
+      "y": 895.0,
+      "type": "wall_intersection",
+      "id": 27
+    },
+    {
+      "x": 931.0,
+      "y": 1012.0,
+      "type": "wall_intersection",
+      "id": 28
+    },
+    {
+      "x": 553.0,
+      "y": 70.0,
+      "type": "wall_end",
+      "id": 29
+    },
+    {
+      "x": 1121.0,
+      "y": 70.0,
+      "type": "wall_end",
+      "id": 30
+    },
+    {
+      "x": 927.0,
+      "y": 330.0,
+      "type": "wall_end",
+      "id": 31
+    },
+    {
+      "x": 837.0,
+      "y": 649.0,
+      "type": "wall_end",
+      "id": 32
+    },
+    {
+      "x": 846.0,
+      "y": 895.0,
+      "type": "wall_end",
+      "id": 33
+    },
+    {
+      "x": 479.0,
+      "y": 896.0,
+      "type": "wall_end",
+      "id": 34
+    },
+    {
+      "x": 1156.0,
+      "y": 1012.0,
+      "type": "wall_end",
+      "id": 35
+    },
+    {
+      "x": 724.0,
+      "y": 356.0,
+      "type": "door_frame",
+      "id": 36
+    },
+    {
+      "x": 1191.0,
+      "y": 446.0,
+      "type": "door_frame",
+      "id": 37
+    },
+    {
+      "x": 721.0,
+      "y": 477.0,
+      "type": "door_frame",
+      "id": 38
+    },
+    {
+      "x": 327.0,
+      "y": 486.0,
+      "type": "door_frame",
+      "id": 39
+    },
+    {
+      "x": 1191.0,
+      "y": 555.0,
+      "type": "door_frame",
+      "id": 40
+    },
+    {
+      "x": 584.0,
+      "y": 736.0,
+      "type": "door_frame",
+      "id": 41
+    },
+    {
+      "x": 719.0,
+      "y": 435.0,
+      "type": "window_frame",
+      "id": 42
+    },
+    {
+      "x": 724.0,
+      "y": 436.0,
+      "type": "window_frame",
+      "id": 43
+    },
+    {
+      "x": 1192.0,
+      "y": 509.0,
+      "type": "window_frame",
+      "id": 44
+    },
+    {
+      "x": 724.0,
+      "y": 548.0,
+      "type": "window_frame",
+      "id": 45
+    },
+    {
+      "x": 327.0,
+      "y": 549.0,
+      "type": "window_frame",
+      "id": 46
+    },
+    {
+      "x": 721.0,
+      "y": 549.0,
+      "type": "window_frame",
+      "id": 47
+    },
+    {
+      "x": 1192.0,
+      "y": 616.0,
+      "type": "window_frame",
+      "id": 48
+    },
+    {
+      "x": 584.0,
+      "y": 807.0,
+      "type": "window_frame",
+      "id": 49
+    },
+    {
+      "x": 1084.0,
+      "y": 519.0,
+      "type": "room_corner",
+      "id": 50
+    },
+    {
+      "x": 892.0,
+      "y": 535.0,
+      "type": "room_corner",
+      "id": 51
+    },
+    {
+      "x": 891.0,
+      "y": 538.0,
+      "type": "room_corner",
+      "id": 52
+    },
+    {
+      "x": 1080.0,
+      "y": 425.0,
+      "type": "opening_corner",
+      "id": 53
+    },
+    {
+      "x": 1078.0,
+      "y": 537.0,
+      "type": "opening_corner",
+      "id": 54
+    },
+    {
+      "x": 891.0,
+      "y": 637.0,
+      "type": "structure_corner",
+      "id": 55
+    },
+    {
+      "x": 891.0,
+      "y": 640.0,
+      "type": "structure_corner",
+      "id": 56
+    },
+    {
+      "x": 916.0,
+      "y": 640.0,
+      "type": "structure_corner",
+      "id": 57
+    },
+    {
+      "x": 1056.0,
+      "y": 640.0,
+      "type": "structure_corner",
+      "id": 58
+    },
+    {
+      "x": 1080.0,
+      "y": 525.0,
+      "type": "junction_unknown",
+      "id": 59
+    },
+    {
+      "x": 1077.0,
+      "y": 638.0,
+      "type": "junction_unknown",
+      "id": 60
+    },
+    {
+      "x": 1080.0,
+      "y": 638.0,
+      "type": "junction_unknown",
+      "id": 61
+    }
+  ],
+  "foundation": {
+    "id": "foundation_1",
+    "type": "foundation",
+    "vertices": [
+      {
+        "x": 318.0,
+        "y": 62.0
+      },
+      {
+        "x": 1198.0,
+        "y": 62.0
+      },
+      {
+        "x": 1198.0,
+        "y": 1020.0
+      },
+      {
+        "x": 318.0,
+        "y": 1020.0
+      }
+    ],
+    "area": 843040.0,
+    "perimeter": 3676.0,
+    "num_vertices": 4,
+    "source": "building_extremes"
+  },
+  "building_outline": {
+    "id": "building_outline_1",
+    "type": "building_outline",
+    "vertices": [
+      {
+        "x": 327.0,
+        "y": 70.0,
+        "junction_name": "J6",
+        "junction_id": 6,
+        "junction_type": "window_left_corner",
+        "corner": 0
+      },
+      {
+        "x": 326.0,
+        "y": 458.0,
+        "junction_name": "J18",
+        "junction_id": 18,
+        "junction_type": "door_corner",
+        "corner": 0
+      },
+      {
+        "x": 327.0,
+        "y": 486.0,
+        "junction_name": "J39",
+        "junction_id": 39,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 327.0,
+        "y": 549.0,
+        "junction_name": "J46",
+        "junction_id": 46,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 326.0,
+        "y": 648.0,
+        "junction_name": "J19",
+        "junction_id": 19,
+        "junction_type": "door_corner",
+        "corner": 0
+      },
+      {
+        "x": 327.0,
+        "y": 895.0,
+        "junction_name": "J4",
+        "junction_id": 4,
+        "junction_type": "door_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 387.0,
+        "y": 895.0,
+        "junction_name": "J27",
+        "junction_id": 27,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 479.0,
+        "y": 896.0,
+        "junction_name": "J34",
+        "junction_id": 34,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 585.0,
+        "y": 897.0,
+        "junction_name": "J15",
+        "junction_id": 15,
+        "junction_type": "wall_junction_l",
+        "corner": 0
+      },
+      {
+        "x": 723.0,
+        "y": 897.0,
+        "junction_name": "J16",
+        "junction_id": 16,
+        "junction_type": "wall_junction_l",
+        "corner": 0
+      },
+      {
+        "x": 754.0,
+        "y": 894.0,
+        "junction_name": "J26",
+        "junction_id": 26,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 846.0,
+        "y": 895.0,
+        "junction_name": "J33",
+        "junction_id": 33,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 898.0,
+        "y": 895.0,
+        "junction_name": "J9",
+        "junction_id": 9,
+        "junction_type": "window_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 899.0,
+        "y": 1012.0,
+        "junction_name": "J5",
+        "junction_id": 5,
+        "junction_type": "door_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 931.0,
+        "y": 1012.0,
+        "junction_name": "J28",
+        "junction_id": 28,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 1156.0,
+        "y": 1012.0,
+        "junction_name": "J35",
+        "junction_id": 35,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 1192.0,
+        "y": 1012.0,
+        "junction_name": "J2",
+        "junction_id": 2,
+        "junction_type": "door_left_corner",
+        "corner": 1
+      },
+      {
+        "x": 1192.0,
+        "y": 651.0,
+        "junction_name": "J14",
+        "junction_id": 14,
+        "junction_type": "wall_junction_cross",
+        "corner": 0
+      },
+      {
+        "x": 1192.0,
+        "y": 616.0,
+        "junction_name": "J48",
+        "junction_id": 48,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 1191.0,
+        "y": 555.0,
+        "junction_name": "J40",
+        "junction_id": 40,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 1192.0,
+        "y": 509.0,
+        "junction_name": "J44",
+        "junction_id": 44,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 1191.0,
+        "y": 446.0,
+        "junction_name": "J37",
+        "junction_id": 37,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 1192.0,
+        "y": 415.0,
+        "junction_name": "J12",
+        "junction_id": 12,
+        "junction_type": "wall_junction_cross",
+        "corner": 0
+      },
+      {
+        "x": 1191.0,
+        "y": 70.0,
+        "junction_name": "J7",
+        "junction_id": 7,
+        "junction_type": "window_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 1121.0,
+        "y": 70.0,
+        "junction_name": "J30",
+        "junction_id": 30,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 966.0,
+        "y": 70.0,
+        "junction_name": "J22",
+        "junction_id": 22,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 721.0,
+        "y": 71.0,
+        "junction_name": "J10",
+        "junction_id": 10,
+        "junction_type": "wall_junction_t",
+        "corner": 0
+      },
+      {
+        "x": 553.0,
+        "y": 70.0,
+        "junction_name": "J29",
+        "junction_id": 29,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 398.0,
+        "y": 70.0,
+        "junction_name": "J21",
+        "junction_id": 21,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 327.0,
+        "y": 70.0,
+        "junction_name": "J6",
+        "junction_id": 6,
+        "junction_type": "window_left_corner",
+        "corner": 1
+      }
+    ],
+    "area": 748316.5,
+    "perimeter": 3612.240488863607,
+    "num_vertices": 30,
+    "source": "junction_contour_fixed"
+  },
+  "street": {
+    "id": "street_1",
+    "junction_id": "6",
+    "junction": {
+      "x": 327.0,
+      "y": 70.0
+    },
+    "street_point": {
+      "x": 327.0,
+      "y": 38.810508254885015
+    },
+    "home_point": {
+      "x": 327.0,
+      "y": 101.18949174511499
+    },
+    "wall_thickness": 15.594745872557493,
+    "distance_to_foundation": 23.189491745114985
+  },
+  "statistics": {
+    "walls": 34,
+    "windows": 8,
+    "doors": 5,
+    "pillars": 0,
+    "pillar_polygons": 0,
+    "rooms": 1,
+    "junctions": 61,
+    "foundations": 1,
+    "building_outlines": 1,
+    "streets": 1
+  }
+}

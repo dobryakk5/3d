@@ -254,7 +254,7 @@ def add_opening_to_json(json_data: Dict, opening: Dict, edge_junctions: List[Tup
 def save_json_data(json_data: Dict, output_path: str) -> None:
     """Сохраняет JSON данные в файл"""
     print(f"Сохранение данных в JSON: {output_path}")
-    with open(output_path, 'w') as f:
+    with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(json_data, f, indent=2)
     print(f"  ✓ Данные успешно сохранены")
 
@@ -665,6 +665,53 @@ def find_next_junction_in_direction(start_junction: JunctionPoint, direction: st
             closest_junction = junction
     
     return closest_junction
+
+def find_candidate_junctions_in_direction(start_junction: JunctionPoint, direction: str, junctions: List[JunctionPoint], tolerance: float, max_candidates: int = 10) -> List[JunctionPoint]:
+    """
+    Находит несколько ближайших junctions в заданном направлении, отсортированных по расстоянию.
+
+    Args:
+        start_junction: начальный узел
+        direction: 'left' | 'right' | 'up' | 'down'
+        junctions: все узлы
+        tolerance: допуск выравнивания по перпендикулярной оси
+        max_candidates: максимальное количество кандидатов
+
+    Returns:
+        Список узлов-кандидатов, отсортированных по возрастанию расстояния
+    """
+    candidates = []
+    for junction in junctions:
+        if junction.id == start_junction.id:
+            continue
+
+        aligned = False
+        distance = 0.0
+
+        if direction == 'left':
+            aligned = (junction.x < start_junction.x and abs(junction.y - start_junction.y) <= tolerance)
+            if aligned:
+                distance = start_junction.x - junction.x
+        elif direction == 'right':
+            aligned = (junction.x > start_junction.x and abs(junction.y - start_junction.y) <= tolerance)
+            if aligned:
+                distance = junction.x - start_junction.x
+        elif direction == 'up':
+            aligned = (junction.y < start_junction.y and abs(junction.x - start_junction.x) <= tolerance)
+            if aligned:
+                distance = start_junction.y - junction.y
+        elif direction == 'down':
+            aligned = (junction.y > start_junction.y and abs(junction.x - start_junction.x) <= tolerance)
+            if aligned:
+                distance = junction.y - start_junction.y
+
+        if aligned:
+            candidates.append((distance, junction))
+
+    candidates.sort(key=lambda t: t[0])
+    if max_candidates is not None:
+        candidates = candidates[:max_candidates]
+    return [j for _, j in candidates]
 
 def create_bbox_from_junctions(start_junction: JunctionPoint, 
                              end_junction: JunctionPoint, 
@@ -1408,7 +1455,13 @@ def segment_exists(start_junction: JunctionPoint, end_junction: JunctionPoint, e
             return True
     return False
 
-def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint], wall_segments: List[WallSegmentFromOpening], junction_wall_segments: List[WallSegmentFromJunction], all_junctions: List[JunctionPoint], wall_thickness: float, json_data: Dict = None) -> List[WallSegmentFromJunction]:
+def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint],
+                                             wall_segments: List[WallSegmentFromOpening],
+                                             junction_wall_segments: List[WallSegmentFromJunction],
+                                             all_junctions: List[JunctionPoint],
+                                             wall_thickness: float,
+                                             json_data: Dict = None,
+                                             wall_polygons: List[Dict] = None) -> List[WallSegmentFromJunction]:
     """
     Достраивает недостающие сегменты стен для junctions не связанных с проемами
     
@@ -1424,6 +1477,24 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint], wa
         Список новых сегментов стен
     """
     new_segments = []
+
+    # Вспомогательные функции для поиска полигона и пересечения в направлении
+    def find_containing_polygon_for_point(px: float, py: float) -> Optional[Dict]:
+        if not wall_polygons:
+            return None
+        for wall in wall_polygons:
+            vertices = wall.get('vertices', [])
+            if vertices and is_point_in_polygon(px, py, vertices):
+                return wall
+        return None
+
+    def get_polygon_edge_intersection(j: JunctionPoint, direction: str) -> Optional[float]:
+        polygon = find_containing_polygon_for_point(j.x, j.y)
+        if not polygon:
+            return None
+        analysis = analyze_polygon_extensions_with_thickness({'x': j.x, 'y': j.y}, polygon['vertices'], wall_thickness)
+        intersections = analysis.get('intersections', {})
+        return intersections.get(direction)
     
     for junction in junctions:
         # Получаем существующие направления для этого junction
@@ -1442,20 +1513,24 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint], wa
         
         # Для каждого недостающего направления строим сегмент стены
         for direction in missing_directions:
-            # Ищем следующий junction в этом направлении
-            next_junction = find_next_junction_in_direction(junction, direction, all_junctions, wall_thickness / 2.0)
-            
-            if next_junction:
+            # Перебираем кандидатов по близости, пока не найдем подходящего
+            candidates = find_candidate_junctions_in_direction(
+                junction, direction, all_junctions, wall_thickness / 2.0
+            )
+            created = False
+
+            # Локальный предел по полигону: не соединять через разрыв полигона
+            polygon_edge_coord = get_polygon_edge_intersection(junction, direction)
+            for next_junction in candidates:
                 # Проверяем, не существует ли уже сегмент между этими junctions
                 all_existing_segments = wall_segments + junction_wall_segments + new_segments
                 if segment_exists(junction, next_junction, all_existing_segments):
                     print(f"    ✗ Сегмент между J{junction.id} и J{next_junction.id} уже существует, пропускаем")
                     continue
-                
-                # Дополнительная проверка: убедимся, что next_junction также нуждается в соединении
-                next_existing_directions = get_existing_directions_for_junction(next_junction, wall_segments, junction_wall_segments, wall_thickness)
+
+                # Дополнительная проверка: убедимся, что next_junction также логично соединять
                 next_required_directions = next_junction.directions if next_junction.directions else []
-                
+
                 # Определяем противоположное направление
                 opposite_direction = {
                     'left': 'right',
@@ -1463,18 +1538,40 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint], wa
                     'up': 'down',
                     'down': 'up'
                 }.get(direction, direction)
-                
-                # Проверяем, нужно ли следующему junction соединение в противоположном направлении
-                if opposite_direction not in next_required_directions:
-                    print(f"    ✗ Следующий junction J{next_junction.id} не требует соединения в направлении {opposite_direction}")
+
+                # Приоритет: если у next_junction есть противоположное направление — отлично
+                # Иначе допускаем, если у него есть любая значимая компонента по той же оси (горизонталь/вертикаль)
+                same_axis_ok = False
+                if direction in ['left', 'right']:
+                    same_axis_ok = any(d in next_required_directions for d in ['left', 'right'])
+                else:
+                    same_axis_ok = any(d in next_required_directions for d in ['up', 'down'])
+
+                if opposite_direction not in next_required_directions and not same_axis_ok:
+                    print(f"    ✗ Кандидат J{next_junction.id} не подтверждает соединение (нет {opposite_direction} и нет осевой компоненты), пробуем следующего")
                     continue
-                
+
+                # Проверка: не пересекаем ли границу текущего полигона по пути (ограничиваемся краем полигона)
+                if polygon_edge_coord is not None:
+                    if direction == 'right' and next_junction.x > polygon_edge_coord:
+                        print(f"    ✗ Кандидат J{next_junction.id} за пределами полигона (right до {polygon_edge_coord:.1f}), пробуем следующего")
+                        continue
+                    if direction == 'left' and next_junction.x < polygon_edge_coord:
+                        print(f"    ✗ Кандидат J{next_junction.id} за пределами полигона (left до {polygon_edge_coord:.1f}), пробуем следующего")
+                        continue
+                    if direction == 'down' and next_junction.y > polygon_edge_coord:
+                        print(f"    ✗ Кандидат J{next_junction.id} за пределами полигона (down до {polygon_edge_coord:.1f}), пробуем следующего")
+                        continue
+                    if direction == 'up' and next_junction.y < polygon_edge_coord:
+                        print(f"    ✗ Кандидат J{next_junction.id} за пределами полигона (up до {polygon_edge_coord:.1f}), пробуем следующего")
+                        continue
+
                 # Определяем ориентацию сегмента
                 orientation = 'horizontal' if direction in ['left', 'right'] else 'vertical'
-                
+
                 # Создаем bbox для сегмента
                 bbox = create_bbox_from_junctions(junction, next_junction, orientation, wall_thickness)
-                
+
                 # Создаем новый сегмент
                 segment_id = f"wall_junction_{junction.id}_to_{next_junction.id}_{direction}"
                 new_segment = WallSegmentFromJunction(
@@ -1486,14 +1583,77 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint], wa
                     bbox=bbox
                 )
                 new_segments.append(new_segment)
-                
+
                 # Добавляем сегмент в JSON
                 if json_data:
                     add_wall_segment_from_junction_to_json(json_data, new_segment)
-                
+
                 print(f"    ✓ Создан сегмент от J{junction.id} до J{next_junction.id} в направлении {direction}")
-            else:
-                print(f"    ✗ Не найден следующий junction для J{junction.id} в направлении {direction}")
+                created = True
+                break
+
+            if not created:
+                # Если нет подходящего узла — и если от junction действительно идет полигон,
+                # продолжаем до края полигона, создавая сегмент до границы
+                if polygon_edge_coord is not None:
+                    print(f"    → Нет подходящего узла; создаем сегмент до края полигона в направлении {direction}")
+
+                    # Создаем виртуальную конечную точку на границе полигона
+                    if direction in ['left', 'right']:
+                        end_x = polygon_edge_coord
+                        end_y = junction.y
+                        orientation = 'horizontal'
+                    else:
+                        end_x = junction.x
+                        end_y = polygon_edge_coord
+                        orientation = 'vertical'
+
+                    # Генерируем уникальный ID для виртуального узла на границе полигона
+                    # Используем текущее количество узлов в json_data, если доступно
+                    virtual_id = None
+                    if json_data and isinstance(json_data.get('junctions'), list):
+                        existing_ids = [j.get('id') for j in json_data['junctions'] if isinstance(j, dict) and 'id' in j]
+                        max_id = max(existing_ids) if existing_ids else 0
+                        virtual_id = max_id + 1
+                    else:
+                        # Запасной вариант: отталкиваться от max id среди all_junctions
+                        max_id = max([j.id for j in all_junctions]) if all_junctions else 0
+                        virtual_id = max_id + 1
+
+                    virtual_end = JunctionPoint(
+                        x=end_x,
+                        y=end_y,
+                        junction_type='polygon_edge',
+                        id=virtual_id,
+                        detected_type='wall_end',
+                        directions=[],
+                        confidence=1.0,
+                    )
+
+                    # Добавляем виртуальный узел в JSON, чтобы привязки работали корректно
+                    if json_data is not None:
+                        add_junction_to_json(json_data, virtual_end)
+
+                    # Создаем bbox для сегмента до края полигона
+                    bbox = create_bbox_from_junctions(junction, virtual_end, orientation, wall_thickness)
+
+                    segment_id = f"wall_junction_{junction.id}_to_edge_{direction}"
+                    edge_segment = WallSegmentFromJunction(
+                        segment_id=segment_id,
+                        start_junction=junction,
+                        end_junction=virtual_end,
+                        direction=direction,
+                        orientation=orientation,
+                        bbox=bbox,
+                    )
+                    new_segments.append(edge_segment)
+
+                    if json_data is not None:
+                        add_wall_segment_from_junction_to_json(json_data, edge_segment)
+
+                    print(f"    ✓ Создан сегмент от J{junction.id} до края полигона ({direction})")
+                else:
+                    print(f"    ✗ Не удалось подобрать подходящий узел для J{junction.id} в направлении {direction}")
     
     print(f"\n  ✓ Создано {len(new_segments)} новых сегментов стен для junctions не связанных с проемами")
     return new_segments
@@ -2674,53 +2834,65 @@ def visualize_polygons_opening_based_with_junction_types():
     print(f"{'='*60}")
     
     junction_wall_segments = []  # Инициализируем пустой список для сегментов стен из junctions
-    max_iterations = 5  # Максимальное количество итераций для предотвращения бесконечного цикла
+    # Увеличиваем ограничение итераций и обрабатываем все доступные узлы на каждой итерации,
+    # пока появляются новые сегменты. Это предотвращает ситуацию, когда обрабатывается только часть junctions.
+    max_iterations = max(20, len(junctions_with_types))
     iteration = 0
-    
+
     while iteration < max_iterations:
         iteration += 1
         print(f"\n--- Итерация {iteration} ---")
-        
+
         # Находим junctions не связанные с проемами или уже построенными сегментами
-        non_opening_junctions = find_junctions_not_related_to_openings(junctions_with_types, wall_segments, junction_wall_segments)
-        
+        non_opening_junctions = find_junctions_not_related_to_openings(
+            junctions_with_types, wall_segments, junction_wall_segments
+        )
+
         if not non_opening_junctions:
-            print(f"  ✓ Все junctions связаны с проемами или уже имеют достаточное количество сегментов стен")
+            print("  ✓ Все junctions связаны с проемами или уже имеют достаточное количество сегментов стен")
             break
-        
-        # Обрабатываем по одному junction за раз для предотвращения дублирования
-        processed_any = False
+
+        # Обрабатываем все такие junctions за итерацию, избегая дубликатов
+        added_this_iteration = 0
         for junction in non_opening_junctions:
             print(f"  Обработка junction {junction.id}...")
-            
-            # Достраиваем недостающие сегменты только для одного junction
+
             new_segments = build_missing_wall_segments_for_junctions(
-                [junction], wall_segments, junction_wall_segments, junctions_with_types, wall_thickness, json_data
+                [junction], wall_segments, junction_wall_segments, junctions_with_types, wall_thickness, json_data, data.get('wall_polygons', [])
             )
-            
-            if new_segments:
-                # Проверяем на дубликаты перед добавлением
-                unique_segments = []
-                for new_segment in new_segments:
-                    if not segment_exists(new_segment.start_junction, new_segment.end_junction,
-                                         wall_segments + junction_wall_segments + unique_segments):
-                        unique_segments.append(new_segment)
-                        print(f"    ✓ Создан уникальный сегмент от J{new_segment.start_junction.id} до J{new_segment.end_junction.id}")
-                    else:
-                        print(f"    ✗ Сегмент от J{new_segment.start_junction.id} до J{new_segment.end_junction.id} уже существует, пропускаем")
-                
-                if unique_segments:
-                    # Добавляем только уникальные сегменты
-                    junction_wall_segments.extend(unique_segments)
-                    print(f"  ✓ Создано {len(unique_segments)} новых уникальных сегментов для junction {junction.id}")
-                    processed_any = True
-                    break  # Переходим к следующей итерации после успешной обработки
-            else:
+
+            if not new_segments:
                 print(f"  ✗ Не удалось создать сегменты для junction {junction.id}")
-        
-        if not processed_any:
-            print(f"  ✓ Не удалось создать новые сегменты стен на итерации {iteration}")
+                continue
+
+            unique_segments = []
+            for new_segment in new_segments:
+                if not segment_exists(
+                    new_segment.start_junction,
+                    new_segment.end_junction,
+                    wall_segments + junction_wall_segments + unique_segments,
+                ):
+                    unique_segments.append(new_segment)
+                    print(
+                        f"    ✓ Создан уникальный сегмент от J{new_segment.start_junction.id} до J{new_segment.end_junction.id}"
+                    )
+                else:
+                    print(
+                        f"    ✗ Сегмент от J{new_segment.start_junction.id} до J{new_segment.end_junction.id} уже существует, пропускаем"
+                    )
+
+            if unique_segments:
+                junction_wall_segments.extend(unique_segments)
+                added_this_iteration += len(unique_segments)
+                print(
+                    f"  ✓ Создано {len(unique_segments)} новых уникальных сегментов для junction {junction.id}"
+                )
+
+        if added_this_iteration == 0:
+            print(f"  ✓ Новые сегменты стен не найдены на итерации {iteration}")
             break
+        else:
+            print(f"  ✓ Добавлено {added_this_iteration} сегментов на итерации {iteration}")
     
     # Process L-junctions and extend original segments
     print(f"\n{'='*60}")
@@ -3875,14 +4047,44 @@ def copy_to_main_json(input_path: str, output_json_path: str) -> None:
     
     try:
         # Загружаем исходные данные
-        with open(input_path, 'r') as f:
-            source_data = json.load(f)
+        try:
+            with open(input_path, 'r', encoding='utf-8') as f:
+                source_data = json.load(f)
+        except UnicodeDecodeError:
+            # Пробуем другие кодировки
+            encodings = ['latin-1', 'cp1252', 'iso-8859-1']
+            for encoding in encodings:
+                try:
+                    with open(input_path, 'r', encoding=encoding) as f:
+                        source_data = json.load(f)
+                    print(f"  ✓ Исходный файл загружен с кодировкой: {encoding}")
+                    break
+                except Exception:
+                    continue
+            else:
+                print(f"  ✗ Не удалось загрузить исходный файл с поддерживаемыми кодировками")
+                raise
         
         print(f"  ✓ Исходный файл загружен: {input_path}")
         
         # Загружаем основной JSON файл
-        with open(output_json_path, 'r') as f:
-            main_data = json.load(f)
+        try:
+            with open(output_json_path, 'r', encoding='utf-8') as f:
+                main_data = json.load(f)
+        except UnicodeDecodeError:
+            # Пробуем другие кодировки
+            encodings = ['latin-1', 'cp1252', 'iso-8859-1']
+            for encoding in encodings:
+                try:
+                    with open(output_json_path, 'r', encoding=encoding) as f:
+                        main_data = json.load(f)
+                    print(f"  ✓ Основной JSON файл загружен с кодировкой: {encoding}")
+                    break
+                except Exception:
+                    continue
+            else:
+                print(f"  ✗ Не удалось загрузить основной JSON файл с поддерживаемыми кодировками")
+                raise
         
         print(f"  ✓ Основной JSON файл загружен: {output_json_path}")
         
@@ -3911,7 +4113,7 @@ def copy_to_main_json(input_path: str, output_json_path: str) -> None:
         main_data["statistics"]["has_street"] = source_data.get("street") is not None
         
         # Сохраняем обновленный основной файл
-        with open(output_json_path, 'w') as f:
+        with open(output_json_path, 'w', encoding='utf-8') as f:
             json.dump(main_data, f, indent=2)
         
         print(f"  ✓ Основной JSON файл обновлен: {output_json_path}")
@@ -3920,10 +4122,258 @@ def copy_to_main_json(input_path: str, output_json_path: str) -> None:
     except Exception as e:
         print(f"  ✗ Ошибка при копировании объектов: {e}")
 
+def main():
+    """Основная функция с поддержкой аргументов командной строки"""
+    # Проверяем аргументы командной строки
+    if len(sys.argv) > 1:
+        input_path = sys.argv[1]
+        # Создаем имена выходных файлов в той же директории, что и входной файл
+        input_dir = os.path.dirname(input_path) or '.'
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_json_path = os.path.join(input_dir, f'{base_name}_wall_coordinates.json')
+        output_path = os.path.join(input_dir, f'{base_name}_wall_polygons.svg')
+    else:
+        # Используем файлы по умолчанию
+        input_path = 'plan_floor1_objects.json'
+        output_json_path = 'wall_coordinates.json'
+        output_path = 'wall_polygons.svg'
+    
+    print("="*60)
+    print("СОЗДАНИЕ ВЕКТОРНОЙ ВИЗУАЛИЗАЦИИ НА ОСНОВЕ ПРОЕМОВ С АНАЛИЗОМ ТИПОВ JUNCTIONS")
+    print("="*60)
+    
+    # Параметры
+    padding = 50  # Отступы от краев SVG
+    
+    # Проверяем существование входного файла
+    if not os.path.exists(input_path):
+        print(f"✗ Ошибка: файл не найден - {input_path}")
+        return
+    
+    # Загружаем данные
+    data = load_objects_data(input_path)
+    if not data:
+        print("✗ Ошибка: не удалось загрузить данные")
+        return
+    
+    # Определяем толщину стен (минимальная толщина двери)
+    wall_thickness = get_wall_thickness_from_doors(data)
+    
+    # Инициализируем JSON структуру для хранения данных
+    json_data = initialize_json_data(input_path, wall_thickness)
+    
+    # Обрабатываем проемы с учетом junctions
+    print(f"\n{'='*60}")
+    print("ОБРАБОТКА ПРОЕМОВ С УЧЕТОМ JUNCTIONS")
+    print(f"{'='*60}")
+    
+    wall_segments = process_openings_with_junctions(data, wall_thickness, json_data)
+    
+    # Обрабатываем колонны и создаем квадраты
+    process_pillars_to_squares(data, wall_thickness, json_data)
+    
+    # Анализируем типы junctions с улучшенной логикой
+    print(f"\n{'='*60}")
+    print("АНАЛИЗ ТИПОВ JUNCTIONS С УЛУЧШЕННОЙ ЛОГИКОЙ")
+    print(f"{'='*60}")
+    
+    junctions = parse_junctions(data)
+    junctions_with_types = analyze_junction_types_with_thickness(junctions, data, wall_thickness)
+    
+    # Добавляем все junctions в JSON
+    for junction in junctions_with_types:
+        add_junction_to_json(json_data, junction)
+    
+    # Находим junctions не связанные с проемами и достраиваем недостающие сегменты
+    print(f"\n{'='*60}")
+    print("ПОИСК JUNCTIONS НЕ СВЯЗАННЫХ С ПРОЕМАМИ И ДОСТРАИВАНИЕ СТЕН")
+    print(f"{'='*60}")
+    
+    junction_wall_segments = []  # Инициализируем пустой список для сегментов стен из junctions
+    # Обрабатываем все подходящие junctions на каждой итерации, пока появляются новые сегменты
+    max_iterations = max(20, len(junctions_with_types))
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
+        print(f"\n--- Итерация {iteration} ---")
+
+        # Находим junctions не связанные с проемами или уже построенными сегментами
+        non_opening_junctions = find_junctions_not_related_to_openings(
+            junctions_with_types, wall_segments, junction_wall_segments
+        )
+
+        if not non_opening_junctions:
+            print("  ✓ Все junctions связаны с проемами или уже имеют достаточное количество сегментов стен")
+            break
+
+        added_this_iteration = 0
+        for junction in non_opening_junctions:
+            print(f"  Обработка junction {junction.id}...")
+
+            new_segments = build_missing_wall_segments_for_junctions(
+                [junction], wall_segments, junction_wall_segments, junctions_with_types, wall_thickness, json_data, data.get('wall_polygons', [])
+            )
+
+            if not new_segments:
+                print(f"  ✗ Не удалось создать сегменты для junction {junction.id}")
+                continue
+
+            unique_segments = []
+            for new_segment in new_segments:
+                if not segment_exists(
+                    new_segment.start_junction,
+                    new_segment.end_junction,
+                    wall_segments + junction_wall_segments + unique_segments,
+                ):
+                    unique_segments.append(new_segment)
+                    print(
+                        f"    ✓ Создан уникальный сегмент от J{new_segment.start_junction.id} до J{new_segment.end_junction.id}"
+                    )
+                else:
+                    print(
+                        f"    ✗ Сегмент от J{new_segment.start_junction.id} до J{new_segment.end_junction.id} уже существует, пропускаем"
+                    )
+
+            if unique_segments:
+                junction_wall_segments.extend(unique_segments)
+                added_this_iteration += len(unique_segments)
+                print(
+                    f"  ✓ Создано {len(unique_segments)} новых уникальных сегментов для junction {junction.id}"
+                )
+
+        if added_this_iteration == 0:
+            print(f"  ✓ Новые сегменты стен не найдены на итерации {iteration}")
+            break
+        else:
+            print(f"  ✓ Добавлено {added_this_iteration} сегментов на итерации {iteration}")
+    
+    # Process L-junctions and extend original segments
+    print(f"\n{'='*60}")
+    print("ОБРАБОТКА L-JUNCTIONS И РАСШИРЕНИЕ ОРИГИНАЛЬНЫХ СЕГМЕНТОВ")
+    print(f"{'='*60}")
+    
+    extended_count = process_l_junction_extensions(
+        junctions_with_types, wall_segments, junction_wall_segments,
+        data.get('wall_polygons', []), wall_thickness
+    )
+    
+    # Обновляем статистику расширенных сегментов
+    json_data["statistics"]["extended_segments"] = extended_count
+    
+    # Обновляем JSON данные с расширенными сегментами
+    print(f"\n{'='*60}")
+    print("ОБНОВЛЕНИЕ JSON ДАННЫХ С РАСШИРЕННЫМИ СЕГМЕНТАМИ")
+    print(f"{'='*60}")
+    
+    # Очищаем существующие списки сегментов в JSON
+    json_data["wall_segments_from_openings"] = []
+    json_data["wall_segments_from_junctions"] = []
+    
+    # Добавляем обновленные сегменты из проемов в JSON
+    for segment in wall_segments:
+        add_wall_segment_from_opening_to_json(json_data, segment)
+        print(f"  ✓ Обновлен сегмент из проема: {segment.segment_id}")
+    
+    # Добавляем обновленные сегменты из junctions в JSON
+    for segment in junction_wall_segments:
+        add_wall_segment_from_junction_to_json(json_data, segment)
+        print(f"  ✓ Обновлен сегмент из junction: {segment.segment_id}")
+    
+    print(f"  ✓ JSON данные обновлены с {extended_count} расширенными сегментами")
+    
+    # Добавляем привязки junctions к стенам
+    print(f"\n{'='*60}")
+    print("ДОБАВЛЕНИЕ ПРИВЯЗОК JUNCTIONS К СТЕНАМ")
+    print(f"{'='*60}")
+    
+    update_existing_junctions_with_wall_bindings(json_data)
+    
+    # Выравнивание стен по проемам
+    print(f"\n{'='*60}")
+    print("ВЫРАВНИВАНИЕ СТЕН ПО ПРОЕМАМ")
+    print(f"{'='*60}")
+    
+    # Проверяем на дубликаты перед выравниванием
+    print(f"  Проверка на дубликаты сегментов:")
+    print(f"    Сегменты из проемов: {len(wall_segments)}")
+    print(f"    Сегменты из junctions: {len(junction_wall_segments)}")
+    
+    # Применяем выравнивание непосредственно к существующим сегментам
+    apply_alignment_to_existing_segments(wall_segments, junction_wall_segments, data)
+    
+    print(f"  ✓ Выравнивание применено к {len(wall_segments)} сегментам из проемов и {len(junction_wall_segments)} сегментам из junctions")
+    
+    # Объединяем все сегменты стен в один список для визуализации
+    all_wall_segments_for_visualization = []
+    
+    # Добавляем сегменты из проемов
+    all_wall_segments_for_visualization.extend(wall_segments)
+    
+    # Добавляем сегменты из junctions
+    all_wall_segments_for_visualization.extend(junction_wall_segments)
+    
+    print(f"\n{'='*60}")
+    print(f"ИТОГО: {len(wall_segments)} сегментов стен из проемов + {len(junction_wall_segments)} сегментов стен из junctions + {extended_count} расширенных сегментов")
+    print(f"Объединенный список для визуализации: {len(all_wall_segments_for_visualization)} сегментов")
+    print(f"{'='*60}")
+    
+    # Сохраняем все данные в JSON
+    print(f"\n{'='*60}")
+    print("СОХРАНЕНИЕ ДАННЫХ В JSON")
+    print(f"{'='*60}")
+    
+    save_json_data(json_data, output_json_path)
+    
+    # Создаем SVG на основе сохраненных JSON данных
+    print(f"\n{'='*60}")
+    print("СОЗДАНИЕ SVG ИЗ JSON ДАННЫХ")
+    print(f"{'='*60}")
+    
+    create_svg_from_json(output_json_path, output_path, data)
+    
+    # Выводим статистику
+    wall_polygons_count = len(data.get('wall_polygons', []))
+    pillar_polygons_count = len(data.get('pillar_polygons', []))
+    windows_count = sum(1 for o in data.get('openings', []) if o.get('type') == 'window')
+    doors_count = sum(1 for o in data.get('openings', []) if o.get('type') == 'door')
+    junctions_count = len(junctions_with_types)
+    
+    # Считаем статистику по типам junctions
+    type_counts = {}
+    for junction in junctions_with_types:
+        jtype = junction.detected_type
+        type_counts[jtype] = type_counts.get(jtype, 0) + 1
+    
+    print(f"\nСтатистика объектов:")
+    print(f"  Полигоны стен: {wall_polygons_count}")
+    print(f"  Сегменты стен из проемов: {len(wall_segments)}")
+    print(f"  Сегменты стен из junctions: {len(junction_wall_segments)}")
+    print(f"  Расширенные сегменты: {extended_count} (оригинальные сегменты увеличены)")
+    print(f"  Выровненные стены: встроено в существующие сегменты")
+    print(f"  Всего сегментов стен: {len(wall_segments) + len(junction_wall_segments)}")
+    print(f"  Объединенный список для визуализации: {len(all_wall_segments_for_visualization)}")
+    print(f"  Колонны: {pillar_polygons_count}")
+    print(f"  Квадраты колонн: {json_data['statistics']['total_pillar_squares']}")
+    print(f"  Окна: {windows_count}")
+    print(f"  Двери: {doors_count}")
+    print(f"  Junctions: {junctions_count}")
+    print(f"  Толщина стен (минимальная толщина двери): {wall_thickness:.1f} px")
+    
+    print(f"\nСтатистика по типам junctions:")
+    for jtype, count in type_counts.items():
+        print(f"  {jtype}: {count}")
+    
+    # Добавляем объекты outline, foundation и street в основной JSON файл
+    copy_to_main_json(input_path, output_json_path)
+    
+    print(f"\nГотово! Векторная визуализация с измененной логикой расширения сегментов создана: {output_path}")
+    print(f"Данные координат сохранены в: {output_json_path}")
+
 if __name__ == '__main__':
     # Сначала пробуем запустить основную функцию
     try:
-        visualize_polygons_opening_based_with_junction_types()
+        main()
     except Exception as e:
         print(f"✗ Ошибка при выполнении основной функции: {e}")
         print("\nЗапускаем замену колонн в существующем SVG файле...")

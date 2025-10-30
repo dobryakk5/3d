@@ -8,7 +8,9 @@ import bpy
 import bmesh
 import os
 import json
+import random
 from mathutils import Vector
+import sys
 
 # ---------------------------------
 # Константы
@@ -18,7 +20,7 @@ WALL_THICKNESS_PX = 22.0   # толщина стены в пикселях
 WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
 CUT_MARGIN = 0.05          # запас для гарантии пересечения
-OPENING_WIDTH_MULTIPLIER = 1.95  # масштаб ширины проёмов
+OPENING_WIDTH_MULTIPLIER = 1.93  # масштаб ширины проёмов
 WINDOW_FRAME_WIDTH = 0.05  # ширина рамки окна по периметру (м)
 
 WINDOW_BOTTOM = 0.65
@@ -31,6 +33,47 @@ JSON_PATH = os.path.join(SCRIPT_DIR, "wall_coordinates_inverted.json")
 OUTPUT_OBJ = os.path.join(SCRIPT_DIR, "precise_building_outline_with_openings.obj")
 OBJ_HEIGHT_SOURCE_PATH = os.path.join(SCRIPT_DIR, "wall_coordinates_inverted_3d.obj")
 OUTPUT_NORMALS_JSON = os.path.join(SCRIPT_DIR, "mesh_normals.json")
+
+def _derive_defaults_from_json(json_path):
+    base_dir = os.path.dirname(os.path.abspath(json_path))
+    base_name = os.path.splitext(os.path.basename(json_path))[0]
+    return {
+        'heights_obj': os.path.join(base_dir, f"{base_name}_3d.obj"),
+        'out_obj': os.path.join(base_dir, f"{base_name}_outline_with_openings.obj"),
+    }
+
+def _apply_cli_overrides(argv):
+    """Парсит CLI аргументы: --json, --heights-obj, --out.
+    Возвращает кортеж (json_path, heights_obj, out_obj, normals_json). --json обязателен.
+    """
+    json_path = None
+    heights_obj = None
+    out_obj = None
+    for i, a in enumerate(argv):
+        if a == '--json' and i + 1 < len(argv):
+            json_path = argv[i + 1]
+        elif a.startswith('--json='):
+            json_path = a.split('=', 1)[1]
+        elif a == '--heights-obj' and i + 1 < len(argv):
+            heights_obj = argv[i + 1]
+        elif a.startswith('--heights-obj='):
+            heights_obj = a.split('=', 1)[1]
+        elif a == '--out' and i + 1 < len(argv):
+            out_obj = argv[i + 1]
+        elif a.startswith('--out='):
+            out_obj = a.split('=', 1)[1]
+
+    if not json_path:
+        print("Ошибка: не указан путь к JSON. Использование: --json <path> [--heights-obj <path>] [--out <path>]")
+        sys.exit(1)
+    if not os.path.exists(json_path):
+        print(f"Ошибка: JSON файл не найден: {json_path}")
+        sys.exit(1)
+
+    derived = _derive_defaults_from_json(json_path)
+    heights_obj = heights_obj or derived['heights_obj']
+    out_obj = out_obj or derived['out_obj']
+    return json_path, heights_obj, out_obj
 
 # Параметры фундамента 
 FOUNDATION_Z_OFFSET = 0.0   # верх фундамента на уровне низа здания
@@ -1454,8 +1497,195 @@ def compute_outline_centroid(outline_vertices):
     return cx, cy
 
 
+def ensure_brick_texture_image(texture_path=None,
+                               width=1024,
+                               height=1024,
+                               brick_w=54,
+                               brick_h=24,
+                               mortar=10):
+    """Генерирует тайловую текстуру кирпича и сохраняет как JPEG, если файл отсутствует.
+
+    Подбирает размеры так, чтобы изображение было тайловым по краям:
+    - Горизонтальный период: brick_w + mortar (по ширине)
+    - Вертикальный период (2 ряда): 2 * (brick_h + mortar)
+    """
+    if texture_path is None:
+        texture_path = os.path.join(SCRIPT_DIR, "brick_texture.jpg")
+
+    try:
+        if os.path.exists(texture_path):
+            return texture_path
+
+        # подгоняем размеры до кратности периодам
+        period_x = max(8, int(brick_w + mortar))
+        period_y = max(8, int(2 * (brick_h + mortar)))
+        width_adj = (width // period_x) * period_x
+        height_adj = (height // period_y) * period_y
+        if width_adj < period_x:
+            width_adj = period_x
+        if height_adj < period_y:
+            height_adj = period_y
+
+        img = bpy.data.images.new("BrickTextureGen", width=width_adj, height=height_adj)
+        pixels = [0.0] * (width_adj * height_adj * 4)
+
+        half_brick = brick_w // 2
+
+        def hash01(ix, iy):
+            # детерминированный «рандом» по кирпичу
+            v = (ix * 928371 + iy * 523847 + 713) % 1000
+            return v / 1000.0
+
+        for y in range(height_adj):
+            row_period = brick_h + mortar
+            row_idx = (y // row_period) % 2  # чёт/нечет ряд
+            y_in = y % row_period
+            mortar_y = (y_in >= brick_h)
+            for x in range(width_adj):
+                x_shift = half_brick if row_idx == 1 else 0
+                x_in = (x + x_shift) % (brick_w + mortar)
+                mortar_x = (x_in >= brick_w)
+
+                if mortar_x or mortar_y:
+                    r, g, b = 0.82, 0.82, 0.80  # цвет шва
+                else:
+                    # индекс текущего кирпича в сетке
+                    bx = ((x + x_shift) // (brick_w + mortar))
+                    by = (y // (brick_h + mortar))
+                    t = hash01(int(bx), int(by))
+                    # плавная вариация оттенка
+                    base1 = (0.63, 0.27, 0.18)
+                    base2 = (0.55, 0.22, 0.12)
+                    k = 0.35 * (t - 0.5)
+                    r = max(0.0, min(1.0, (base1[0] * (1 - t) + base2[0] * t) + k))
+                    g = max(0.0, min(1.0, (base1[1] * (1 - t) + base2[1] * t) + k * 0.5))
+                    b = max(0.0, min(1.0, (base1[2] * (1 - t) + base2[2] * t) + k * 0.25))
+
+                idx = (y * width_adj + x) * 4
+                pixels[idx + 0] = r
+                pixels[idx + 1] = g
+                pixels[idx + 2] = b
+                pixels[idx + 3] = 1.0
+
+        img.pixels = pixels
+        img.filepath_raw = texture_path
+        img.file_format = 'JPEG'
+        img.save()
+        print(f"    ✅ Сгенерирована текстура кирпича: {texture_path} ({width_adj}x{height_adj})")
+        return texture_path
+    except Exception as e:
+        print(f"    ⚠️  Не удалось сгенерировать brick_texture.jpg: {e}")
+        return None
+
+
+def get_or_create_brick_material(name="OuterWall_Brick_Procedural"):
+    """Создает или возвращает процедурный материал кирпича для внешних стен.
+
+    Использует ShaderNodeTexBrick + лёгкий bump и объектные координаты для
+    бесшовного наложения без UV.
+    """
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+
+    # Попытка использовать сгенерированную текстуру-изображение
+    tex_path = ensure_brick_texture_image(os.path.join(SCRIPT_DIR, "brick_texture.jpg"))
+    if tex_path and os.path.exists(tex_path):
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+
+        out = nodes.new(type='ShaderNodeOutputMaterial')
+        bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+        bsdf.inputs['Roughness'].default_value = 0.75
+        bsdf.inputs['Specular'].default_value = 0.25
+
+        texcoord = nodes.new(type='ShaderNodeTexCoord')
+        mapping = nodes.new(type='ShaderNodeMapping')
+        mapping.inputs['Scale'].default_value = (4.0, 4.0, 4.0)
+
+        img = nodes.new(type='ShaderNodeTexImage')
+        try:
+            image = bpy.data.images.load(tex_path)
+        except Exception:
+            image = None
+        if image:
+            img.image = image
+        img.interpolation = 'Smart'
+        img.projection = 'BOX'
+        img.projection_blend = 0.05
+
+        # Лёгкий bump из монохрома текстуры
+        to_gray = nodes.new(type='ShaderNodeRGBToBW')
+        bump = nodes.new(type='ShaderNodeBump')
+        bump.inputs['Strength'].default_value = 0.1
+        bump.inputs['Distance'].default_value = 1.0
+
+        links.new(texcoord.outputs['Object'], mapping.inputs['Vector'])
+        links.new(mapping.outputs['Vector'], img.inputs['Vector'])
+        links.new(img.outputs['Color'], bsdf.inputs['Base Color'])
+        links.new(img.outputs['Color'], to_gray.inputs['Color'])
+        links.new(to_gray.outputs['Val'], bump.inputs['Height'])
+        links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+        links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+        return mat
+
+    # Fallback: процедурный кирпич
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    nodes.clear()
+
+    out = nodes.new(type='ShaderNodeOutputMaterial')
+    bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    bsdf.inputs['Roughness'].default_value = 0.8
+    bsdf.inputs['Specular'].default_value = 0.2
+
+    texcoord = nodes.new(type='ShaderNodeTexCoord')
+    mapping = nodes.new(type='ShaderNodeMapping')
+    mapping.inputs['Scale'].default_value = (2.0, 2.0, 2.0)
+
+    brick = nodes.new(type='ShaderNodeTexBrick')
+    brick.inputs['Scale'].default_value = 3.0
+    brick.inputs['Mortar Size'].default_value = 0.015
+    brick.inputs['Mortar Smooth'].default_value = 0.60
+    brick.inputs['Bias'].default_value = 0.0
+    brick.inputs['Brick Width'].default_value = 0.28
+    brick.inputs['Row Height'].default_value = 0.07
+    brick.inputs['Color1'].default_value = (0.63, 0.27, 0.18, 1.0)
+    brick.inputs['Color2'].default_value = (0.55, 0.22, 0.12, 1.0)
+    brick.inputs['Mortar'].default_value = (0.82, 0.82, 0.80, 1.0)
+
+    noise = nodes.new(type='ShaderNodeTexNoise')
+    noise.inputs['Scale'].default_value = 10.0
+    noise.inputs['Detail'].default_value = 2.0
+    noise.inputs['Roughness'].default_value = 0.5
+
+    mix = nodes.new(type='ShaderNodeMixRGB')
+    mix.blend_type = 'MULTIPLY'
+    mix.inputs['Fac'].default_value = 0.2
+
+    invert = nodes.new(type='ShaderNodeInvert')
+    bump = nodes.new(type='ShaderNodeBump')
+    bump.inputs['Strength'].default_value = 0.12
+    bump.inputs['Distance'].default_value = 0.8
+
+    links.new(texcoord.outputs['Object'], mapping.inputs['Vector'])
+    links.new(mapping.outputs['Vector'], brick.inputs['Vector'])
+    links.new(brick.outputs['Color'], mix.inputs['Color1'])
+    links.new(noise.outputs['Color'], mix.inputs['Color2'])
+    links.new(mix.outputs['Color'], bsdf.inputs['Base Color'])
+    links.new(brick.outputs['Fac'], invert.inputs['Color'])
+    links.new(invert.outputs['Color'], bump.inputs['Height'])
+    links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+    links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+    return mat
+
+
 def assign_wall_materials(obj, outline_vertices,
-                          outer_color=(1.0, 1.0, 0.0, 1.0),  # жёлтый
+                          outer_color=(1.0, 1.0, 0.0, 1.0),  # не используется для кирпича
                           inner_color=(1.0, 1.0, 1.0, 1.0)):  # белый
     """Назначает материал фасадам: внешние — жёлтые, внутренние — белые.
 
@@ -1489,8 +1719,8 @@ def assign_wall_materials(obj, outline_vertices,
                     inside = not inside
         return inside
 
-    # Материалы
-    outer_mat = get_or_create_material("OuterWall_Yellow", outer_color)
+    # Материалы: внешний — кирпич, внутренний — белый
+    outer_mat = get_or_create_brick_material("OuterWall_Brick_Procedural")
     inner_mat = get_or_create_material("InnerWall_White", inner_color)
 
     mats = obj.data.materials
@@ -1762,6 +1992,9 @@ def main():
 
     clear_scene()
     data = load_json_data(JSON_PATH)
+    # Жесткая проверка наличия building_outline
+    if ("building_outline" not in data) or (not data["building_outline"]) or ("vertices" not in data["building_outline"]) or (not data["building_outline"]["vertices"]):
+        raise RuntimeError("В JSON отсутствует корректный 'building_outline' (нет vertices)")
 
     vertices, segments_with_bbox, edges_without_bbox = get_outline_junctions_and_segments(data)
     rectangles = create_rectangles(segments_with_bbox, edges_without_bbox, data["junctions"])
@@ -1908,17 +2141,27 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
-    
     # Проверяем, передан ли параметр --no-auto-run
     auto_run = "--no-auto-run" not in sys.argv
-    
+
     if auto_run:
+        # Применяем CLI переопределения путей
+        jp, hp, op = _apply_cli_overrides(sys.argv)
+        # Переопределяем глобальные пути
+        JSON_PATH = jp
+        OBJ_HEIGHT_SOURCE_PATH = hp
+        OUTPUT_OBJ = op
+        # Нормали: используем тот же префикс, что и у выходного OBJ
+        out_dir = os.path.dirname(os.path.abspath(OUTPUT_OBJ))
+        out_base = os.path.splitext(os.path.basename(OUTPUT_OBJ))[0]
+        # Если имя заканчивается на _outline_with_openings, отсечём этот суффикс
+        prefix_base = out_base[:-len("_outline_with_openings")] if out_base.endswith("_outline_with_openings") else out_base
+        OUTPUT_NORMALS_JSON = os.path.join(out_dir, f"{prefix_base}_mesh_normals.json")
+
         print("=" * 70)
         print("АВТОМАТИЧЕСКИЙ ЗАПУСК СОЗДАНИЯ КОНТУРА С ПРОЁМАМИ")
         print("=" * 70)
-        
-        success = True
+
         try:
             main()
             print("=" * 70)
@@ -1926,7 +2169,6 @@ if __name__ == "__main__":
             print("=" * 70)
         except Exception as e:
             print(f"Ошибка при выполнении: {e}")
-            success = False
             print("=" * 70)
             print("АВТОМАТИЧЕСКИЙ ЗАПУСК ЗАВЕРШИЛСЯ С ОШИБКОЙ")
             print("=" * 70)

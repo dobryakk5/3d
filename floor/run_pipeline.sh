@@ -43,7 +43,7 @@ cd "$SCRIPT_DIR"
 RELATIVE_INPUT_FILE="../$INPUT_FILE"
 
 # Запускаем Python скрипт с относительным путем к входному файлу
-python3 run_pipeline.py "$RELATIVE_INPUT_FILE"
+python3 floor_pipeline.py "$RELATIVE_INPUT_FILE"
 
 # Проверяем результат
 if [ $? -eq 0 ]; then
@@ -58,7 +58,7 @@ if [ $? -eq 0 ]; then
     BASE_NAME=$(basename "$BASE_NAME" .jpeg)
     
     # Ищем выходные файлы в текущей директории (floor)
-    ls -la "enhanced_hatching_strict_mask.png" "${BASE_NAME}_objects.json" "wall_coordinates.json" "wall_polygons.svg" 2>/dev/null || echo "Некоторые выходные файлы могут отсутствовать"
+    ls -la "${BASE_NAME}_hatching_mask.png" "${BASE_NAME}_objects.json" "${BASE_NAME}_objects_wall_coordinates.json" "${BASE_NAME}_objects_wall_polygons.svg" 2>/dev/null || echo "Некоторые выходные файлы могут отсутствовать"
 else
     echo ""
     echo "=========================================="

@@ -1,0 +1,42 @@
+Шаг 1: floor/hatching_mask.py
+
+Вход: floor/<base>.jpg
+Выход: floor/<base>_hatching_mask.png
+Добавляет: бинарную маску штриховки стен для последующей сегментации.
+
+Шаг 2: floor/export_objects.py
+
+Вход: floor/<base>.jpg, опционально floor/<base>_hatching_mask.png
+Выход: floor/<base>_objects.json
+Добавляет: детектированные объекты (стены, двери, окна, колонны, комнаты), узлы junctions, а также при наличии — foundation, building_outline, street.
+
+Шаг 3: floor/visualize_polygons_align.py
+
+Вход: floor/<base>_objects.json
+Выход: floor/<base>_objects.json (перезапись на месте)
+Добавляет: нормализацию толщины проёмов и выравнивание их положения вдоль стен (с метаданными выравнивания).
+
+Шаг 4: floor/visualize_polygons_w.py
+
+Вход: floor/<base>_objects.json
+Выход: floor/<base>_objects_wall_coordinates.json, floor/<base>_objects_wall_polygons.svg
+Добавляет: структурированные сегменты стен от проёмов и от узлов, типизацию junctions, квадраты колонн, а также копирует building_outline/foundation/street в итоговый JSON и обновляет статистику.
+
+Шаг 5: blender/invert_json_coord.py
+
+Подготовка: копируется floor/<base>_objects_wall_coordinates.json → blender/<base>_objects_wall_coordinates.json
+Вход: blender/<base>_objects_wall_coordinates.json
+Выход: blender/<base>_objects_wall_coordinates_inverted.json
+Добавляет: инверсию X‑координат (включая building_outline, foundation, openings, сегменты) относительно центра.
+
+Шаг 6: Blender фоновый — blender/create_walls_2m.py -- --json <..._inverted.json>
+
+Вход: blender/<base>_objects_wall_coordinates_inverted.json
+Выход: blender/<base>_objects_wall_coordinates_inverted_3d.obj, blender/<base>_objects_wall_coordinates_inverted_isometric.jpg
+Добавляет: 3D‑экструзию стен/проёмов, разделение внешних/внутренних, материалы и изометрию на основе building_outline.
+
+Шаг 7: Blender обычный — blender/create_outline_with_openings.py -- --json <..._inverted.json> --heights-obj <..._3d.obj> --out <..._outline_with_openings.obj>
+
+Вход: blender/<base>_objects_wall_coordinates_inverted.json, blender/<base>_objects_wall_coordinates_inverted_3d.obj
+Выход: blender/<base>_objects_outline_with_openings.obj, blender/<base>_objects_mesh_normals.json
+Добавляет: цельный контур стен из прямоугольников, прорезанные проёмы (по bbox/высотам), нумерацию стен и экспорт нормалей.

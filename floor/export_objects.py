@@ -20,6 +20,7 @@ import sys
 sys.path.append('floortrans')
 from floortrans.models import get_model
 import svgwrite
+import math
 
 # Заглушка для отсутствующей функции
 def enhance_lines_with_hatching(wall_mask, gray, min_line_length, min_line_overlap_ratio):
@@ -366,6 +367,180 @@ def detect_hatching_enhanced_fixed(image,
         print(f"Добавлено горизонтальных линий: {horiz_count}, вертикальных линий: {vert_count}")
     
     return wall_mask
+
+def _circle_edge_support(edge_img, cx, cy, r, tol=2, step_deg=5, sector=None):
+    """
+    Estimate how much of a circle's circumference is supported by edges.
+
+    Args:
+        edge_img: binary edges (uint8 0/255)
+        cx, cy: circle center (float)
+        r: radius (float)
+        tol: neighborhood radius to consider a hit
+        step_deg: angular sampling step in degrees
+
+    Returns:
+        support_ratio in [0,1]
+    """
+    h, w = edge_img.shape[:2]
+    total = 0
+    hits = 0
+    start_deg = 0
+    end_deg = 360
+    if sector is not None:
+        # sector = (center_deg, half_width_deg)
+        cdeg, half = sector
+        start_deg = int(cdeg - half)
+        end_deg = int(cdeg + half)
+    for ang in range(start_deg, end_deg, step_deg):
+        total += 1
+        theta = math.radians(ang)
+        x = int(round(cx + r * math.cos(theta)))
+        y = int(round(cy + r * math.sin(theta)))
+        # Check within image bounds
+        if x < 0 or x >= w or y < 0 or y >= h:
+            continue
+        # Neighborhood check for robustness
+        x0, y0 = max(0, x - tol), max(0, y - tol)
+        x1, y1 = min(w - 1, x + tol), min(h - 1, y + tol)
+        patch = edge_img[y0:y1+1, x0:x1+1]
+        if patch is not None and (patch > 0).any():
+            hits += 1
+    if total == 0:
+        return 0.0
+    return hits / float(total) if total > 0 else 0.0
+
+def has_arc_near_opening(img_rgb, opening, margin=24):
+    """
+    Heuristic detector: checks for a door swing arc (circular segment) near an opening bbox.
+
+    Strategy:
+    - Crop ROI around the bbox with margin
+    - Detect edges in ROI
+    - Try HoughCircles to find candidate circles with radii appropriate to ROI
+    - For each circle, measure edge support around circumference; require partial arc support
+    - Additionally require the circle center to be near one of the bbox corners (hinge)
+
+    Returns:
+        True if an arc is likely present near the opening, else False
+    """
+    # Support both dict bbox and tuple/list bbox
+    if isinstance(opening.get('bbox'), dict):
+        x, y, w, h = opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height']
+    else:
+        x, y, w, h = opening['bbox']
+
+    H, W = img_rgb.shape[:2]
+    x0 = max(0, int(x - margin))
+    y0 = max(0, int(y - margin))
+    x1 = min(W - 1, int(x + w + margin))
+    y1 = min(H - 1, int(y + h + margin))
+
+    if x1 <= x0 or y1 <= y0:
+        return False
+
+    roi = img_rgb[y0:y1, x0:x1]
+    if roi.size == 0:
+        return False
+
+    # Prepare edges
+    try:
+        gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
+    except Exception:
+        gray = roi if roi.ndim == 2 else cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(gray, 60, 160, apertureSize=3)
+
+    # HoughCircles to propose radii
+    roi_h, roi_w = gray.shape[:2]
+    # Radii bounds: liberal, relative to ROI
+    # Expected door arc radius is close to the longer bbox side (doorway width)
+    expected = max(w, h)
+    min_r = max(8, int(0.4 * expected))
+    max_r = min(int(1.4 * expected), int(0.9 * max(roi_w, roi_h)))
+
+    circles = None
+    try:
+        circles = cv2.HoughCircles(
+            gray,
+            cv2.HOUGH_GRADIENT,
+            dp=1.2,
+            minDist=max(8, int(min(roi_w, roi_h) * 0.1)),
+            param1=120,
+            param2=16,
+            minRadius=min_r,
+            maxRadius=max_r
+        )
+    except Exception:
+        circles = None
+
+    # Corner points (global coords)
+    box_corners = [
+        (x, y), (x + w, y), (x, y + h), (x + w, y + h)
+    ]
+
+    def center_near_corner(cx, cy, r):
+        # Accept if center is near any bbox corner (hinge area)
+        for (cx0, cy0) in box_corners:
+            if math.hypot(cx - cx0, cy - cy0) <= max(14, 0.35 * r):
+                return True
+        return False
+
+    def sector_towards_hinge(cx, cy, r):
+        # Build a sector centered at the angle from hinge corner to circle center
+        # Use the nearest corner as hinge
+        best = None
+        best_d = 1e9
+        for (cx0, cy0) in box_corners:
+            d = math.hypot(cx - cx0, cy - cy0)
+            if d < best_d:
+                best_d = d
+                best = (cx0, cy0)
+        if best is None:
+            return None
+        cx0, cy0 = best
+        ang = math.degrees(math.atan2(cy - cy0, cx - cx0))
+        # 120-degree sector around hinge->center direction
+        return (ang, 60)
+
+    # Evaluate candidates from Hough
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        for c in circles[0, :]:
+            cx_roi, cy_roi, r = int(c[0]), int(c[1]), int(c[2])
+            # Shift to global coords
+            cx_glob = cx_roi + x0
+            cy_glob = cy_roi + y0
+            # Measure support
+            sector = sector_towards_hinge(cx_glob, cy_glob, r)
+            support_global = _circle_edge_support(edges, cx_roi, cy_roi, r, tol=2, step_deg=5)
+            support_sector = _circle_edge_support(edges, cx_roi, cy_roi, r, tol=2, step_deg=5, sector=sector) if sector else 0.0
+            # Radius sanity relative to doorway size
+            ratio = r / float(max(w, h)) if max(w, h) > 0 else 0
+            if (center_near_corner(cx_glob, cy_glob, r)
+                and 0.7 <= ratio <= 1.3
+                and support_global >= 0.25 and support_sector >= 0.45):
+                return True
+
+    # Fallback: use enclosing circle of largest contour
+    contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    if contours:
+        cnt = max(contours, key=cv2.arcLength)
+        if cv2.arcLength(cnt, False) > 24:
+            (cx_roi, cy_roi), r = cv2.minEnclosingCircle(cnt)
+            cx_glob = cx_roi + x0
+            cy_glob = cy_roi + y0
+            # Compute support ratio on edges
+            sector = sector_towards_hinge(cx_glob, cy_glob, r)
+            support_global = _circle_edge_support(edges, cx_roi, cy_roi, r, tol=2, step_deg=5)
+            support_sector = _circle_edge_support(edges, cx_roi, cy_roi, r, tol=2, step_deg=5, sector=sector) if sector else 0.0
+            ratio = r / float(max(w, h)) if max(w, h) > 0 else 0
+            if (center_near_corner(cx_glob, cy_glob, r)
+                and 0.7 <= ratio <= 1.3
+                and support_global >= 0.3 and support_sector >= 0.5):
+                return True
+
+    return False
 
 def extract_wall_polygons(wall_mask, min_vertices=4, epsilon_factor=2.0):
     """
@@ -1533,6 +1708,372 @@ def find_building_outline_from_junctions(junctions, pillar_polygons=None, openin
         "source": "junction_contour_fixed"
     }
 
+def has_door_junctions_near(opening, all_junctions, max_distance=45):
+    """
+    Confirmation via door-specific junctions (from DL heatmaps):
+    Accepts if there is at least one nearby junction of type
+    'door_left_corner', 'door_right_corner', 'door_corner', or 'door_frame'.
+    """
+    # bbox support both tuple and dict
+    if isinstance(opening.get('bbox'), dict):
+        x, y, w, h = opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height']
+    else:
+        x, y, w, h = opening['bbox']
+
+    # Points to test: side centers and corners
+    test_pts = [
+        (x + w/2, y), (x + w/2, y + h), (x, y + h/2), (x + w, y + h/2),
+        (x, y), (x + w, y), (x, y + h), (x + w, y + h)
+    ]
+    door_types = {
+        'door_left_corner', 'door_right_corner', 'door_corner', 'door_frame'
+    }
+
+    for j in all_junctions:
+        jtype = j.get('type')
+        if jtype not in door_types:
+            continue
+        jx, jy = float(j.get('x', 0)), float(j.get('y', 0))
+        for px, py in test_pts:
+            if math.hypot(jx - px, jy - py) <= max_distance:
+                return True
+    return False
+
+def point_to_rect_distance(px, py, x, y, w, h):
+    """Minimum Euclidean distance from point (px,py) to rectangle x,y,w,h (0 if inside)."""
+    if w <= 0 or h <= 0:
+        return float('inf')
+    rx0, ry0, rx1, ry1 = x, y, x + w, y + h
+    dx = max(rx0 - px, 0, px - rx1)
+    dy = max(ry0 - py, 0, py - ry1)
+    if dx == 0 and dy == 0:
+        return 0.0
+    return math.hypot(dx, dy)
+
+def has_any_junction_within_half_thickness(opening, all_junctions):
+    """
+    Accept if any junction lies within half of the door 'thickness',
+    where thickness is the smaller side of the door bbox (min(w,h)).
+    Distance is measured from junction point to the bbox rectangle (0 if inside).
+    """
+    if isinstance(opening.get('bbox'), dict):
+        x, y, w, h = opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height']
+    else:
+        x, y, w, h = opening['bbox']
+    if w is None or h is None:
+        return False
+    thresh = 0.5 * float(min(w, h))
+    for j in all_junctions:
+        jx, jy = float(j.get('x', 0)), float(j.get('y', 0))
+        dist = point_to_rect_distance(jx, jy, x, y, w, h)
+        if dist <= thresh:
+            return True
+    return False
+    
+    # Функция для поиска соседних junctions в указанном направлении с допуском
+    def find_neighbors_in_direction(current_point, junctions, visited, direction, tolerance=20):
+        neighbors = []
+        
+        for i, junction in enumerate(junctions):
+            if i in visited:
+                continue
+                
+            dx = junction['x'] - current_point['x']
+            dy = junction['y'] - current_point['y']
+            dist = distance(current_point, junction)
+            
+            # Проверяем направление движения с допуском tolerance
+            # Фильтруем только по направлению, без ограничений по расстоянию
+            if direction == 'right' and abs(dy) <= tolerance and dx > 0:
+                neighbors.append((i, junction, dist))
+            elif direction == 'left' and abs(dy) <= tolerance and dx < 0:
+                neighbors.append((i, junction, dist))
+            elif direction == 'up' and abs(dx) <= tolerance and dy < 0:  # dy < 0 так как Y растет вниз
+                neighbors.append((i, junction, dist))
+            elif direction == 'down' and abs(dx) <= tolerance and dy > 0:
+                neighbors.append((i, junction, dist))
+        
+        # Сортируем по расстоянию и возвращаем всех подходящих соседей
+        neighbors.sort(key=lambda x: x[2])
+        return neighbors
+    
+    # Функция для определения возможных направлений движения из текущей точки
+    # Приоритет: 1) направо (поворот по часовой стрелке), 2) прямо (продолжение), 3) налево (поворот против часовой)
+    def get_possible_directions(current_direction):
+        if current_direction == 'right':  # Движемся вправо (восток)
+            # 1) направо = поворот вниз (юг) - по часовой стрелке
+            # 2) прямо = продолжение вправо (восток)
+            # 3) налево = поворот вверх (север) - против часовой стрелки
+            return ['down', 'right', 'up']
+        elif current_direction == 'up':  # Движемся вверх (север)
+            # 1) направо = поворот вправо (восток) - по часовой стрелке
+            # 2) прямо = продолжение вверх (север)
+            # 3) налево = поворот влево (запад) - против часовой стрелки
+            return ['right', 'up', 'left']
+        elif current_direction == 'left':  # Движемся влево (запад)
+            # 1) направо = поворот вверх (север) - по часовой стрелке
+            # 2) прямо = продолжение влево (запад)
+            # 3) налево = поворот вниз (юг) - против часовой стрелки
+            return ['up', 'left', 'down']
+        elif current_direction == 'down':  # Движемся вниз (юг)
+            # 1) направо = поворот влево (запад) - по часовой стрелке
+            # 2) прямо = продолжение вниз (юг)
+            # 3) налево = поворот вправо (восток) - против часовой стрелки
+            return ['left', 'down', 'right']
+        return ['right', 'up', 'left', 'down']
+    
+    # Находим самую нижнюю-левую junction как начальную
+    start_idx = min(range(len(junctions)), key=lambda i: (junctions[i]['y'], junctions[i]['x']))
+    
+    # Определяем начальное направление на основе ближайшего окна
+    start_point = junctions[start_idx]
+    current_direction = 'right'  # По умолчанию
+    
+    # Если есть информация об окнах, используем её для определения направления
+    if openings:
+        try:
+            # Находим ближайшее окно к начальной точке
+            min_dist = float('inf')
+            closest_window = None
+            
+            for opening in openings:
+                if opening['type'] == 'window':
+                    x, y, w, h = opening['bbox']['x'], opening['bbox']['y'], opening['bbox']['width'], opening['bbox']['height']
+                    center_x, center_y = x + w/2, y + h/2
+                    dist = np.sqrt((center_x - start_point['x'])**2 + (center_y - start_point['y'])**2)
+                    
+                    if dist < min_dist:
+                        min_dist = dist
+                        closest_window = opening
+            
+            if closest_window:
+                x, y, w, h = closest_window['bbox']['x'], closest_window['bbox']['y'], closest_window['bbox']['width'], closest_window['bbox']['height']
+                
+                # Определяем ориентацию окна
+                if w > h * 1.5:  # Горизонтальное окно
+                    # Определяем, в какую сторону от окна находится начальная точка
+                    if start_point['x'] < x:  # Точка слева от окна
+                        current_direction = 'right'
+                    else:  # Точка справа от окна
+                        current_direction = 'left'
+                elif h > w * 1.5:  # Вертикальное окно
+                    # Определяем, в какую сторону от окна находится начальная точка
+                    if start_point['y'] < y:  # Точка выше окна
+                        current_direction = 'down'
+                    else:  # Точка ниже окна
+                        current_direction = 'up'
+                
+                print(f"   Начальное направление определено как '{current_direction}' на основе ближайшего окна")
+        except Exception as e:
+            # Если произошла ошибка, используем направление по умолчанию
+            print(f"   Ошибка при определении начального направления: {e}")
+            pass
+    
+    # Начинаем построение контура
+    outline_points = [junctions[start_idx]]
+    visited = {start_idx}
+    current_idx = start_idx
+    
+    max_iterations = len(junctions) * 2  # Предотвращение бесконечного цикла
+    iteration = 0
+    
+    while iteration < max_iterations:
+        current_point = junctions[current_idx]
+        next_point = None
+        next_idx = None
+        
+        # Получаем возможные направления в порядке приоритета
+        possible_directions = get_possible_directions(current_direction)
+        
+        # Ищем следующую точку в каждом из возможных направлений
+        for direction in possible_directions:
+            neighbors = find_neighbors_in_direction(current_point, junctions, visited, direction)
+            
+            if neighbors:
+                # Проверяем, не пересекает ли путь колонну
+                for idx, junction, dist in neighbors:
+                    passes_through_pillar = False
+                    if pillar_polygons:
+                        for pillar in pillar_polygons:
+                            if line_intersects_pillar(current_point, junction, pillar):
+                                passes_through_pillar = True
+                                break
+                    
+                    if not passes_through_pillar:
+                        next_point = junction
+                        next_idx = idx
+                        current_direction = direction
+                        break
+                
+                if next_point is not None:
+                    break
+        
+        # Если не нашли следующую точку в приоритетных направлениях, ищем любую ближайшую
+        if next_point is None:
+            # Сначала проверяем, можно ли вернуться к начальной точке для завершения контура
+            start_point = junctions[start_idx]
+            dist_to_start = distance(current_point, start_point)
+            
+            # Проверяем, достаточно ли точек в контуре для замыкания
+            if len(outline_points) > 3 and dist_to_start < 500:  # Условное максимальное расстояние для замыкания
+                # Проверяем, не пересекает ли путь к начальной точке колонну
+                passes_through_pillar = False
+                if pillar_polygons:
+                    for pillar in pillar_polygons:
+                        if line_intersects_pillar(current_point, start_point, pillar):
+                            passes_through_pillar = True
+                            break
+                
+                if not passes_through_pillar:
+                    next_point = start_point
+                    next_idx = start_idx
+            
+            # Если не удалось замкнуть контур, ищем ближайшую непосещенную точку
+            if next_point is None:
+                min_dist = float('inf')
+                for i, junction in enumerate(junctions):
+                    if i not in visited:
+                        dist = distance(current_point, junction)
+                        if dist < min_dist:
+                            min_dist = dist
+                            next_point = junction
+                            next_idx = i
+                
+                if next_point is not None:
+                    # Определяем новое направление на основе положения следующей точки
+                    dx = next_point['x'] - current_point['x']
+                    dy = next_point['y'] - current_point['y']
+                    
+                    if abs(dx) > abs(dy):
+                        current_direction = 'right' if dx > 0 else 'left'
+                    else:
+                        current_direction = 'up' if dy < 0 else 'down'  # dy < 0 так как Y растет вниз
+        
+        # Если не нашли следующую точку, завершаем контур
+        if next_point is None:
+            break
+        
+        # Добавляем следующую точку в контур
+        outline_points.append(next_point)
+        visited.add(next_idx)
+        current_idx = next_idx
+        
+        # Если мы вернулись к начальной точке, завершаем контур
+        if current_idx == start_idx and len(outline_points) > 3:
+            break
+        
+        iteration += 1
+    
+    # Если контур не замкнулся, пытаемся замкнуть его
+    if len(outline_points) > 2 and outline_points[-1] != junctions[start_idx]:
+        # Проверяем, можно ли замкнуть контур напрямую
+        last_point = outline_points[-1]
+        start_point = junctions[start_idx]
+        
+        # Проверяем, не пересекает ли замыкающий отрезок колонну
+        can_close_directly = True
+        if pillar_polygons:
+            for pillar in pillar_polygons:
+                if line_intersects_pillar(last_point, start_point, pillar):
+                    can_close_directly = False
+                    break
+        
+        if can_close_directly:
+            # Замыкаем контур, добавляя вторую точку контура вместо дублирования начальной
+            # Это предотвращает создание ложной угловой точки при анализе трендов
+            if len(outline_points) > 1:
+                second_point = outline_points[1]
+                outline_points.append(second_point)
+            else:
+                # Если по какой-то причине в контуре только одна точка, добавляем начальную
+                outline_points.append(start_point)
+        else:
+            # Ищем промежуточные точки для замыкания контура
+            # Находим ближайшую непосещенную точку к начальной
+            min_dist = float('inf')
+            closest_to_start = None
+            closest_idx = None
+            
+            for i, junction in enumerate(junctions):
+                if i not in visited:
+                    dist = distance(junction, start_point)
+                    if dist < min_dist:
+                        min_dist = dist
+                        closest_to_start = junction
+                        closest_idx = i
+            
+            if closest_to_start is not None:
+                # Добавляем промежуточную точку и затем начальную
+                outline_points.append(closest_to_start)
+                outline_points.append(start_point)
+    
+    # Если контур получился слишком маленьким, возвращаем пустой контур
+    if len(outline_points) < 3:
+        return {
+            "id": "building_outline_1",
+            "type": "building_outline",
+            "vertices": [],
+            "area": 0.0,
+            "perimeter": 0.0,
+            "num_vertices": 0,
+            "source": "insufficient_outline_points"
+        }
+    
+    # Создаем полигон с информацией о junctions для каждой вершины
+    vertices = []
+    for i, p in enumerate(outline_points):
+        # Пропускаем последнюю точку, если она была добавлена для замыкания контура
+        # (это вторая точка контура, добавленная в конец для замыкания)
+        if i == len(outline_points) - 1 and len(outline_points) > 1:
+            # Проверяем, является ли последняя точка дубликатом второй точки
+            second_point = outline_points[1] if len(outline_points) > 1 else None
+            if second_point and abs(p['x'] - second_point['x']) < 1 and abs(p['y'] - second_point['y']) < 1:
+                # Пропускаем добавление этой точки в vertices
+                continue
+        
+        # Находим соответствующий junction в исходном списке
+        junction_id = None
+        junction_type = None
+        for j in junctions:
+            if abs(j['x'] - p['x']) < 1 and abs(j['y'] - p['y']) < 1:
+                junction_id = j.get('id')
+                junction_type = j['type']
+                break
+        
+        vertex_data = {
+            "x": p["x"],
+            "y": p["y"]
+        }
+        
+        # Добавляем информацию о junction, если она найдена
+        if junction_id is not None:
+            vertex_data["junction_name"] = f"J{junction_id}"
+            vertex_data["junction_id"] = junction_id
+            vertex_data["junction_type"] = junction_type
+        
+        vertices.append(vertex_data)
+    
+    # Вычисляем площадь и периметр
+    area = 0
+    perimeter = 0
+    for i in range(len(vertices)):
+        j = (i + 1) % len(vertices)
+        area += vertices[i]["x"] * vertices[j]["y"] - vertices[j]["x"] * vertices[i]["y"]
+        perimeter += np.sqrt((vertices[j]["x"] - vertices[i]["x"])**2 +
+                            (vertices[j]["y"] - vertices[i]["y"])**2)
+    
+    area = abs(area) / 2
+    
+    return {
+        "id": "building_outline_1",
+        "type": "building_outline",
+        "vertices": vertices,
+        "area": float(area),
+        "perimeter": float(perimeter),
+        "num_vertices": len(vertices),
+        "source": "junction_contour_fixed"
+    }
+
 def find_nearest_junction_to_point(point, junctions):
     """
     Находит ближайшую junction к заданной точке
@@ -2173,8 +2714,23 @@ def main():
     print("EXPORTING FLOOR PLAN OBJECTS TO JSON")
     print("="*80)
 
-    image_path = 'plan_floor1.jpg'
-    output_path = 'plan_floor1_objects.json'
+    # Проверяем аргументы командной строки
+    if len(sys.argv) > 1:
+        image_path = sys.argv[1]
+        # Создаем имя выходного файла на основе имени входного файла
+        # Записываем в текущую рабочую директорию (floor), чтобы следующая стадия пайплайна
+        # могла найти файл по имени `<basename>_objects.json` без путей вверх по дереву.
+        import os
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        output_path = f"{base_name}_objects.json"
+        print(f"Используем входной файл: {image_path}")
+        print(f"Выходной файл: {output_path}")
+    else:
+        # Используем файлы по умолчанию
+        image_path = 'plan_floor1.jpg'
+        base_name = 'plan_floor1'
+        output_path = f'{base_name}_objects.json'
+        print(f"Используем файл по умолчанию: {image_path}")
 
     # Load model
     print("\n[1/6] Loading model...")
@@ -2257,7 +2813,8 @@ def main():
         # This means we need to skip filter_noise_regions_optimized entirely
         try:
             import os
-            ref_mask_path = 'enhanced_hatching_strict_mask.png'
+            # Используем префикс входного изображения
+            ref_mask_path = f"{base_name}_hatching_mask.png"
             if os.path.exists(ref_mask_path):
                 # Load reference mask at original resolution
                 wall_mask_full_res = cv2.imread(ref_mask_path, cv2.IMREAD_GRAYSCALE)
@@ -2427,6 +2984,21 @@ def main():
         for d in doors:
             d['methods'] = analyze_detection_method(d, wall_segments, all_junctions)
 
+        # Confirmation: keep only doors that have ANY junction within half of the door thickness (min(w,h)/2)
+        try:
+            confirmed = []
+            for d in doors:
+                if has_any_junction_within_half_thickness(d, all_junctions):
+                    methods = d.get('methods') if isinstance(d.get('methods'), list) else []
+                    if 'JunctionHalfThickness' not in methods:
+                        methods.append('JunctionHalfThickness')
+                    d['methods'] = methods
+                    confirmed.append(d)
+            print(f"   Junction-only confirmation: kept {len(confirmed)}/{len(doors)} doors (<= 0.5*min(w,h))")
+            doors = confirmed
+        except Exception as e:
+            print(f"   Junction-only confirmation failed, skipping: {e}")
+
         # Detect pillars (standalone, not enclosed by walls) using enhanced hatching
         wall_mask = detect_hatching_enhanced_fixed(img_np, min_area=50, max_area=60000)
         pillars = detect_pillars_for_export(img_np, wall_mask, wall_segments, min_area=50, max_area=60000)
@@ -2532,6 +3104,10 @@ def main():
 
         # Export doors (без junctions пока)
         for i, door in enumerate(doors):
+            # Export only confirmed doors (junction within half thickness)
+            m = door.get('methods') if isinstance(door.get('methods'), list) else []
+            if 'JunctionHalfThickness' not in m:
+                continue
             x, y, w, h = door['bbox']
             wall_id = find_wall_for_opening(door, wall_segments)
             
@@ -2760,11 +3336,13 @@ def main():
         print("\n   Creating SVG visualization...")
         svg_output_path = output_path.replace('.json', '_colored.svg')
         try:
+            # Only draw confirmed doors (junction within half thickness) in SVG as well
+            doors_confirmed_only = [d for d in doors if isinstance(d.get('methods'), list) and 'JunctionHalfThickness' in d['methods']]
             svg_w, svg_h = create_colored_svg(
                 svg_output_path,
                 img_np.shape,
                 wall_segments,
-                doors,
+                doors_confirmed_only,
                 windows,
                 pillars,
                 rooms,
@@ -2797,11 +3375,17 @@ def main():
     print(f"  JSON: {output_path}")
     print(f"  SVG:  {output_path.replace('.json', '_colored.svg')}")
 
-def test_foundation_creation():
+def test_foundation_creation(image_path=None):
     """
     Тестовая функция для проверки создания фундамента
+    
+    Args:
+        image_path: Путь к изображению (опционально)
     """
-    print("Тестирование создания фундамента...")
+    if image_path:
+        print(f"Тестирование создания фундамента для файла: {image_path}")
+    else:
+        print("Тестирование создания фундамента...")
     
     # Создаем тестовые данные стен
     test_walls = [

@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 def invert_json_coordinates(json_path):
     """
@@ -152,14 +153,23 @@ def invert_json_coordinates(json_path):
         return False
 
 if __name__ == "__main__":
-    # Путь к JSON файлу
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(script_dir, "wall_coordinates.json")
-    
+    # Требуем явный путь к JSON файлу
+    if len(sys.argv) < 2:
+        print("Ошибка: не указан путь к JSON файлу с координатами стен")
+        print("Использование: python3 invert_json_coord.py <path/to/<prefix>_wall_coordinates.json>")
+        sys.exit(1)
+
+    json_path = sys.argv[1]
+    if not os.path.exists(json_path):
+        print(f"Ошибка: файл не найден: {json_path}")
+        sys.exit(1)
+
     # Инвертируем координаты в JSON файле
     success = invert_json_coordinates(json_path)
-    
+
     if success:
         print("Инвертирование координат в JSON файле завершено успешно")
+        sys.exit(0)
     else:
         print("Ошибка при инвертировании координат в JSON файле")
+        sys.exit(1)

@@ -58,7 +58,7 @@ if [ "$PART" = "1" ] || [ "$PART" = "both" ]; then
     RELATIVE_INPUT_FILE="../$INPUT_FILE"
     
     # Запускаем Python скрипт с относительным путем к входному файлу
-    python3 run_pipeline.py "$RELATIVE_INPUT_FILE"
+    python3 floor_pipeline.py "$RELATIVE_INPUT_FILE"
     
     # Проверяем результат выполнения первой части
     if [ $? -ne 0 ]; then
@@ -78,19 +78,24 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     echo "ЗАПУСК ВТОРОЙ ЧАСТИ PIPELINE"
     echo "=========================================="
     
-    # Проверяем наличие wall_coordinates.json
-    if [ ! -f "$SCRIPT_DIR/wall_coordinates.json" ]; then
-        echo "Ошибка: файл wall_coordinates.json не найден в директории $SCRIPT_DIR"
-        echo "Пожалуйста, сначала запустите первую часть pipeline"
+    # Вычисляем префикс на основе имени входного файла (без расширения)
+    BASE_NAME=$(basename "$INPUT_FILE")
+    BASE_NAME="${BASE_NAME%.*}"
+    JSON_PREFIX="${BASE_NAME}_objects"
+    
+    # Проверяем наличие префиксного файла координат стен
+    if [ ! -f "$SCRIPT_DIR/${JSON_PREFIX}_wall_coordinates.json" ]; then
+        echo "Ошибка: файл $SCRIPT_DIR/${JSON_PREFIX}_wall_coordinates.json не найден"
+        echo "Пожалуйста, сначала запустите первую часть pipeline для того же входного файла"
         exit 1
     fi
     
-    # Копируем wall_coordinates.json в директорию blender
-    echo "Копирование wall_coordinates.json в директорию blender..."
-    cp "$SCRIPT_DIR/wall_coordinates.json" "$BLENDER_DIR/"
+    # Копируем префиксный файл координат стен в директорию blender
+    echo "Копирование ${JSON_PREFIX}_wall_coordinates.json в директорию blender..."
+    cp "$SCRIPT_DIR/${JSON_PREFIX}_wall_coordinates.json" "$BLENDER_DIR/"
     
     if [ $? -ne 0 ]; then
-        echo "Ошибка: не удалось скопировать wall_coordinates.json в директорию blender"
+        echo "Ошибка: не удалось скопировать ${JSON_PREFIX}_wall_coordinates.json в директорию blender"
         exit 1
     fi
     
@@ -101,7 +106,7 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     
     # Запускаем invert_json_coord.py
     echo "Запуск invert_json_coord.py..."
-    python3 invert_json_coord.py
+    python3 invert_json_coord.py "${JSON_PREFIX}_wall_coordinates.json"
     
     if [ $? -ne 0 ]; then
         echo "Ошибка: invert_json_coord.py завершился с ошибкой"
@@ -113,7 +118,7 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     # Запускаем Blender в фоновом режиме
     echo "Запуск Blender в фоновом режиме для создания 3D стен..."
     echo "Это может занять несколько минут, пожалуйста подождите..."
-    /Applications/Blender.app/Contents/MacOS/Blender --background --python create_walls_2m.py
+    /Applications/Blender.app/Contents/MacOS/Blender --background --python create_walls_2m.py -- --json "${JSON_PREFIX}_wall_coordinates_inverted.json"
     blender_exit_code=$?
     
     if [ $blender_exit_code -eq 0 ]; then
@@ -123,23 +128,23 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     fi
     
     echo "Проверка результатов работы Blender..."
-    if [ -f "wall_coordinates_inverted_3d.obj" ]; then
-        echo "✓ Найден файл wall_coordinates_inverted_3d.obj"
+    if [ -f "${JSON_PREFIX}_wall_coordinates_inverted_3d.obj" ]; then
+        echo "✓ Найден файл ${JSON_PREFIX}_wall_coordinates_inverted_3d.obj"
     else
-        echo "✗ Файл wall_coordinates_inverted_3d.obj не найден"
+        echo "✗ Файл ${JSON_PREFIX}_wall_coordinates_inverted_3d.obj не найден"
     fi
     
-    if [ -f "wall_coordinates_inverted_isometric.jpg" ]; then
-        echo "✓ Найден файл wall_coordinates_inverted_isometric.jpg"
+    if [ -f "${JSON_PREFIX}_wall_coordinates_inverted_isometric.jpg" ]; then
+        echo "✓ Найден файл ${JSON_PREFIX}_wall_coordinates_inverted_isometric.jpg"
     else
-        echo "✗ Файл wall_coordinates_inverted_isometric.jpg не найден"
+        echo "✗ Файл ${JSON_PREFIX}_wall_coordinates_inverted_isometric.jpg не найден"
     fi
     
     echo "Blender в фоновом режиме выполнен"
     
     # Запускаем Blender в обычном режиме
     echo "Запуск Blender в обычном режиме для финальной визуализации..."
-    /Applications/Blender.app/Contents/MacOS/Blender --python create_outline_with_openings.py
+    /Applications/Blender.app/Contents/MacOS/Blender --python create_outline_with_openings.py -- --json "${JSON_PREFIX}_wall_coordinates_inverted.json" --heights-obj "${JSON_PREFIX}_wall_coordinates_inverted_3d.obj" --out "${JSON_PREFIX}_outline_with_openings.obj"
     blender_normal_exit_code=$?
     
     if [ $blender_normal_exit_code -eq 0 ]; then
@@ -150,16 +155,16 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     fi
     
     echo "Проверка результатов работы Blender в обычном режиме..."
-    if [ -f "precise_building_outline_with_openings.obj" ]; then
-        echo "✓ Найден файл precise_building_outline_with_openings.obj"
+    if [ -f "${JSON_PREFIX}_outline_with_openings.obj" ]; then
+        echo "✓ Найден файл ${JSON_PREFIX}_outline_with_openings.obj"
     else
-        echo "✗ Файл precise_building_outline_with_openings.obj не найден"
+        echo "✗ Файл ${JSON_PREFIX}_outline_with_openings.obj не найден"
     fi
     
-    if [ -f "mesh_normals.json" ]; then
-        echo "✓ Найден файл mesh_normals.json"
+    if [ -f "${JSON_PREFIX}_mesh_normals.json" ]; then
+        echo "✓ Найден файл ${JSON_PREFIX}_mesh_normals.json"
     else
-        echo "✗ Файл mesh_normals.json не найден"
+        echo "✗ Файл ${JSON_PREFIX}_mesh_normals.json не найден"
     fi
     
     echo "Blender в обычном режиме выполнен"
@@ -181,13 +186,11 @@ if [ $? -eq 0 ]; then
     echo "Pipeline выполнен успешно!"
     echo "=========================================="
     echo ""
-    echo "Созданные файлы:"
-    # Получаем базовое имя файла без расширения для поиска выходных файлов
-    BASE_NAME=$(basename "$INPUT_FILE" .jpg)
-    BASE_NAME=$(basename "$BASE_NAME" .jpeg)
-    
-    # Ищем выходные файлы в текущей директории (floor)
-    ls -la "enhanced_hatching_strict_mask.png" "${BASE_NAME}_objects.json" "wall_coordinates.json" "wall_polygons.svg" 2>/dev/null || echo "Некоторые выходные файлы могут отсутствовать"
+    echo "Созданные файлы (в директории floor):"
+    BASE_NAME=$(basename "$INPUT_FILE")
+    BASE_NAME="${BASE_NAME%.*}"
+    JSON_PREFIX="${BASE_NAME}_objects"
+    ls -la "floor/${BASE_NAME}_hatching_mask.png" "floor/${BASE_NAME}_objects.json" "floor/${JSON_PREFIX}_wall_coordinates.json" "floor/${JSON_PREFIX}_wall_polygons.svg" 2>/dev/null || echo "Некоторые выходные файлы могут отсутствовать"
 else
     echo ""
     echo "=========================================="

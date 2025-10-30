@@ -9,6 +9,7 @@ Unified Pipeline для обработки архитектурных плано
 """
 
 import os
+import shutil
 import sys
 import time
 import traceback
@@ -108,26 +109,33 @@ def run_script(script_name, description="", input_file=None):
         if input_file:
             cmd.append(input_file)
         
+        # Добавляем переменную окружения для кодировки
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
         # Запускаем скрипт как subprocess для лучшей изоляции
         result = subprocess.run(
             cmd,
             cwd=current_dir,
             capture_output=True,
             text=True,
-            timeout=300  # 5 минут таймаут
+            timeout=300,  # 5 минут таймаут
+            env=env
         )
-        
+  
         end_time = time.time()
         elapsed_time = end_time - start_time
         
-        print(f"Время завершения: {time.strftime('%H:%M:%S')}")
-        print(f"Время выполнения: {elapsed_time:.2f} секунд")
+        # Логируем вывод
+        if result.stdout:
+            print("\nВывод:")
+            print(result.stdout)
+        if result.stderr:
+            print("\nСообщения об ошибках:")
+            print(result.stderr)
         
         if result.returncode == 0:
-            print(f"  ✓ Скрипт {script_name} выполнен успешно")
-            if result.stdout:
-                print("\nВывод скрипта:")
-                print(result.stdout)
+            print(f"\n✓ Успешно (время: {elapsed_time:.2f} с)")
             return True
         else:
             print(f"  ✗ Скрипт {script_name} завершился с ошибкой (код: {result.returncode})")
@@ -152,10 +160,10 @@ def check_output_files(base_name):
     print_separator("ПРОВЕРКА ВЫХОДНЫХ ФАЙЛОВ")
     
     output_files = [
-        ("enhanced_hatching_strict_mask.png", "Маска штриховки"),
+        (f"{base_name}_hatching_mask.png", "Маска штриховки"),
         (f"{base_name}_objects.json", "JSON файл с объектами"),
-        ("wall_coordinates.json", "JSON файл с координатами стен"),
-        ("wall_polygons.svg", "SVG файл визуализации"),
+        (f"{base_name}_objects_wall_coordinates.json", "JSON файл с координатами стен"),
+        (f"{base_name}_objects_wall_polygons.svg", "SVG файл визуализации"),
     ]
     
     print("Проверка выходных файлов:")
@@ -170,13 +178,13 @@ def run_export_objects(input_file):
     """Этап 2: Экспорт объектов в JSON"""
     return run_script("export_objects.py", "Export Objects to JSON", input_file)
 
-def run_align_openings():
-    """Этап 3: Выравнивание проемов"""
-    return run_script("visualize_polygons_align.py", "Align Openings")
+def run_align_openings(json_file):
+    """Этап 3: Выравнивание проемов на основе JSON"""
+    return run_script("visualize_polygons_align.py", "Align Openings", json_file)
 
-def run_visualization():
+def run_visualization(json_file):
     """Этап 4: Визуализация полигонов с анализом junctions"""
-    return run_script("visualize_polygons_w.py", "Visualize Polygons with Junction Analysis")
+    return run_script("visualize_polygons_w.py", "Visualize Polygons with Junction Analysis", json_file)
 
 def main():
     """Основная функция pipeline"""
@@ -212,13 +220,14 @@ def main():
     
     # Этап 3: Выравнивание проемов
     print_separator("ЭТАП 3/4: ВЫРАВНИВАНИЕ ПРОЕМОВ")
-    if not run_align_openings():
+    input_json = f"{base_name}_objects.json"
+    if not run_align_openings(input_json):
         print("\n✗ Ошибка на этапе выравнивания проемов")
         return False
     
     # Этап 4: Визуализация полигонов
     print_separator("ЭТАП 4/4: ВИЗУАЛИЗАЦИЯ ПОЛИГОНОВ")
-    if not run_visualization():
+    if not run_visualization(input_json):
         print("\n✗ Ошибка на этапе визуализации")
         return False
     
@@ -235,10 +244,10 @@ def main():
     
     print("\n✓ Все этапы pipeline выполнены успешно!")
     print("\nСозданные файлы:")
-    print(f"  - enhanced_hatching_strict_mask.png (маска штриховки)")
+    print(f"  - {base_name}_hatching_mask.png (маска штриховки)")
     print(f"  - {base_name}_objects.json (объекты плана, выровненные)")
-    print("  - wall_coordinates.json (координаты стен)")
-    print("  - wall_polygons.svg (визуализация)")
+    print(f"  - {base_name}_objects_wall_coordinates.json (координаты стен)")
+    print(f"  - {base_name}_objects_wall_polygons.svg (визуализация)")
     
     return True
 
