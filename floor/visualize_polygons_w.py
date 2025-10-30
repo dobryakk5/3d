@@ -552,12 +552,12 @@ def find_closest_junction(x: float, y: float, junctions: List[JunctionPoint], to
     Finds the closest junction to a given point within tolerance.
     """
     closest_junction = None
-    min_distance = float('inf')
+    best_distance = float('inf')
     
     for junction in junctions:
         distance = math.sqrt((junction.x - x)**2 + (junction.y - y)**2)
-        if distance < min_distance and distance <= tolerance:
-            min_distance = distance
+        if distance < best_distance and distance <= tolerance:
+            best_distance = distance
             closest_junction = junction
     
     return closest_junction
@@ -611,7 +611,7 @@ def find_junctions_at_opening_edges(opening: Dict, junctions: List[JunctionPoint
     
     return edge_junctions
 
-def find_next_junction_in_direction(start_junction: JunctionPoint, direction: str, junctions: List[JunctionPoint], tolerance: float) -> Optional[JunctionPoint]:
+def find_next_junction_in_direction(start_junction: JunctionPoint, direction: str, junctions: List[JunctionPoint], tolerance: float, min_distance: float = 0.0) -> Optional[JunctionPoint]:
     """
     Finds the next junction in a given direction from a starting junction.
     
@@ -619,13 +619,15 @@ def find_next_junction_in_direction(start_junction: JunctionPoint, direction: st
         start_junction: The starting junction point
         direction: Direction to search ('left', 'right', 'up', 'down')
         junctions: List of all junction points
-        tolerance: Tolerance for alignment checking
+        tolerance: Tolerance for alignment checking (perpendicular axis)
+        min_distance: Minimum allowed distance along the search axis. Junctions
+                      closer than this are ignored.
     
     Returns:
         The next junction in the specified direction, or None if not found
     """
     closest_junction = None
-    min_distance = float('inf')
+    best_distance = float('inf')
     
     for junction in junctions:
         # Skip the starting junction
@@ -660,8 +662,12 @@ def find_next_junction_in_direction(start_junction: JunctionPoint, direction: st
                          abs(junction.x - start_junction.x) <= tolerance)
             distance = junction.y - start_junction.y
         
+        # Пропускаем слишком близкие узлы (меньше минимально допустимого расстояния)
         if is_aligned and distance < min_distance:
-            min_distance = distance
+            continue
+
+        if is_aligned and distance < best_distance:
+            best_distance = distance
             closest_junction = junction
     
     return closest_junction
@@ -928,7 +934,8 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
                                       junctions: List[JunctionPoint],
                                       wall_thickness: float,
                                       all_openings: List[Dict] = None,
-                                      json_data: Dict = None) -> List[WallSegmentFromOpening]:
+                                      json_data: Dict = None,
+                                      wall_polygons: List[Dict] = None) -> List[WallSegmentFromOpening]:
     """
     Constructs wall segments from each edge junction of an opening to the next junction.
     Строит сегменты стен, которые точно стыкуются с углами проемов.
@@ -988,29 +995,8 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
         else:  # down
             search_x, search_y = bbox['x'] + bbox['width'] / 2, bbox['y'] + bbox['height']
         
-        # Ищем ближайший junction в направлении от края проема (без изменения bbox проема)
-        nearest_junction = find_nearest_junction_in_direction_from_point(
-            search_x, search_y, direction, junctions, wall_thickness / 2.0
-        )
-        # Вычисляем "малый зазор" от края проема до ближайшего узла по направлению
-        small_gap_junction = None
-        if nearest_junction is not None:
-            if direction == 'left' and nearest_junction.x < search_x:
-                gap = search_x - nearest_junction.x
-                if gap <= wall_thickness:
-                    small_gap_junction = nearest_junction
-            elif direction == 'right' and nearest_junction.x > search_x:
-                gap = nearest_junction.x - search_x
-                if gap <= wall_thickness:
-                    small_gap_junction = nearest_junction
-            elif direction == 'up' and nearest_junction.y < search_y:
-                gap = search_y - nearest_junction.y
-                if gap <= wall_thickness:
-                    small_gap_junction = nearest_junction
-            elif direction == 'down' and nearest_junction.y > search_y:
-                gap = nearest_junction.y - search_y
-                if gap <= wall_thickness:
-                    small_gap_junction = nearest_junction
+        # Ищем следующий junction в направлении от стартового узла, но
+        # игнорируем слишком близкие узлы: distance < wall_thickness/2
         
         # Теперь проверяем, есть ли рядом другой проем
         nearby_opening = None
@@ -1030,13 +1016,12 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
         else:
             print(f"    Соседний проем не найден, создаем стену")
         
-        # Выбираем конечный узел: сначала пробуем малый зазор от края проема, иначе обычный ближайший узел от junction
-        if small_gap_junction is not None:
-            end_junction = small_gap_junction
-            print(f"    Строим короткий сегмент от края проема до J{end_junction.id} (gap <= wall_thickness)")
-        else:
-            # Find the next junction in the direction from the start junction on the opening edge
-            end_junction = find_next_junction_in_direction(start_junction, direction, junctions, wall_thickness / 2.0)
+        # Находим ближайший подходящий узел (не ближе половины толщины стены)
+        end_junction = find_next_junction_in_direction(
+            start_junction, direction, junctions,
+            wall_thickness / 2.0,
+            min_distance=wall_thickness / 2.0
+        )
 
         if end_junction:
             # ИСПРАВЛЕНИЕ: Пересчитываем offset после того, как bbox мог быть изменен
@@ -1129,9 +1114,293 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
             if json_data:
                 add_wall_segment_from_opening_to_json(json_data, wall_segment)
         else:
-            # Handle case where no junction is found - extend to polygon edge or next opening
-            # This would require additional logic to find the boundary
-            print(f"    Предупреждение: не найден junction для проема {opening_id}, сторона {edge_side}")
+            # Нет подходящего junction: сначала пробуем край содержащего полигона, затем fallback
+            print(f"    Нет подходящего junction — попытка дотянуть до края полигона (проем {opening_id}, {edge_side})")
+
+            def find_containing_polygon(px: float, py: float) -> Optional[Dict]:
+                if not wall_polygons:
+                    return None
+                for poly in wall_polygons:
+                    verts = poly.get('vertices', [])
+                    if verts and is_point_in_polygon(px, py, verts):
+                        return poly
+                return None
+
+            end_coord = None
+            inter_key = None
+            # Для выбора полигона используем точку на краю проема, смещенную на половину толщины в нужную сторону
+            # Это соответствует правилу "от двери на половину толщины стены".
+            dir_map = {
+                ('horizontal', 'left'): 'left',
+                ('horizontal', 'right'): 'right',
+                ('vertical', 'top'): 'up',
+                ('vertical', 'bottom'): 'down',
+            }
+            inter_key = dir_map.get((orientation, edge_side))
+
+            sample_x, sample_y = start_junction.x, start_junction.y
+            if inter_key is not None:
+                # Базовая точка на самом краю проема
+                if direction == 'left':
+                    base_x, base_y = bbox['x'], bbox['y'] + bbox['height'] / 2.0
+                elif direction == 'right':
+                    base_x, base_y = bbox['x'] + bbox['width'], bbox['y'] + bbox['height'] / 2.0
+                elif direction == 'up':
+                    base_x, base_y = bbox['x'] + bbox['width'] / 2.0, bbox['y']
+                else:  # 'down'
+                    base_x, base_y = bbox['x'] + bbox['width'] / 2.0, bbox['y'] + bbox['height']
+
+                # Смещаемся на половину толщины в направлении сегмента
+                half = wall_thickness / 2.0
+                dx = dy = 0.0
+                if inter_key == 'up':
+                    dy = -half
+                elif inter_key == 'down':
+                    dy = half
+                elif inter_key == 'left':
+                    dx = -half
+                elif inter_key == 'right':
+                    dx = half
+                sample_x, sample_y = base_x + dx, base_y + dy
+
+            # 1) Пробуем полигон по смещенной от двери точке
+            containing_poly = find_containing_polygon(sample_x, sample_y)
+            if containing_poly is None:
+                # 2) Если не нашли — пробуем по исходному junction
+                containing_poly = find_containing_polygon(start_junction.x, start_junction.y)
+
+            if containing_poly is not None and inter_key is not None:
+                # Анализ пересечений для выбранной точки (лучи из смещенной от двери точки)
+                analysis = analyze_polygon_extensions_with_thickness(
+                    {'x': sample_x, 'y': sample_y},
+                    containing_poly.get('vertices', []),
+                    wall_thickness,
+                )
+                intersections = analysis.get('intersections', {})
+                end_coord = intersections.get(inter_key)
+
+            # Доп. попытка: сместиться от J на половину толщины в нужном направлении и поискать содержащий полигон
+            if end_coord is None and wall_polygons and inter_key is not None:
+                dx = dy = 0.0
+                half = wall_thickness / 2.0
+                if inter_key == 'up':
+                    dy = -half
+                elif inter_key == 'down':
+                    dy = half
+                elif inter_key == 'left':
+                    dx = -half
+                elif inter_key == 'right':
+                    dx = half
+                shifted_poly = find_containing_polygon(start_junction.x + dx, start_junction.y + dy)
+                if shifted_poly is not None:
+                    analysis2 = analyze_polygon_extensions_with_thickness(
+                        {'x': start_junction.x + dx, 'y': start_junction.y + dy},
+                        shifted_poly.get('vertices', []),
+                        wall_thickness,
+                    )
+                    inter2 = analysis2.get('intersections', {})
+                    if inter_key in inter2 and inter2[inter_key] is not None:
+                        end_coord = inter2[inter_key]
+                        print(f"    ✓ Найден край полигона после смещения от J на half-thickness: {inter_key}={end_coord:.1f}")
+
+            if end_coord is None and wall_polygons and inter_key is not None:
+                # Попробуем найти пересечение луча со всеми полигонами, даже если точка не внутри полигона,
+                # используя в качестве базы смещенную от двери точку
+                def ray_intersection_any_polygon(px: float, py: float, direction_key: str,
+                                                 band_half: float = 0.0, samples: int = 1) -> Optional[float]:
+                    eps = 1e-6
+                    best = None
+                    # Сканируем в поперечной полосе шириной band_half (±) для повышения устойчивости
+                    offsets = [0.0]
+                    if band_half > eps and samples > 1:
+                        step = (2.0 * band_half) / (samples - 1)
+                        offsets = [(-band_half + i * step) for i in range(samples)]
+
+                    for off in offsets:
+                        px_off, py_off = px, py
+                        if direction_key in ('up', 'down'):
+                            px_off = px + off  # двигаем по X поперёк вертикального луча
+                        else:
+                            py_off = py + off  # двигаем по Y поперёк горизонтального луча
+
+                        for poly in wall_polygons:
+                            verts = poly.get('vertices', [])
+                            if not verts:
+                                continue
+                            n = len(verts)
+                            for i in range(n):
+                                x1, y1 = verts[i]['x'], verts[i]['y']
+                                x2, y2 = verts[(i + 1) % n]['x'], verts[(i + 1) % n]['y']
+
+                                if direction_key in ('up', 'down'):
+                                    # Пересечение вертикальной прямой x=px_off с ребром (не вертикальным)
+                                    if min(x1, x2) - eps <= px_off <= max(x1, x2) + eps and abs(x2 - x1) > eps:
+                                        t = (px_off - x1) / (x2 - x1)
+                                        if 0 - eps <= t <= 1 + eps:
+                                            yi = y1 + t * (y2 - y1)
+                                            if direction_key == 'up' and yi < py_off - eps:
+                                                if best is None or yi > best:
+                                                    best = yi
+                                            elif direction_key == 'down' and yi > py_off + eps:
+                                                if best is None or yi < best:
+                                                    best = yi
+                                else:  # left/right
+                                    # Пересечение горизонтальной прямой y=py_off с ребром (не горизонтальным)
+                                    if min(y1, y2) - eps <= py_off <= max(y1, y2) + eps and abs(y2 - y1) > eps:
+                                        t = (py_off - y1) / (y2 - y1)
+                                        if 0 - eps <= t <= 1 + eps:
+                                            xi = x1 + t * (x2 - x1)
+                                            if direction_key == 'left' and xi < px_off - eps:
+                                                if best is None or xi > best:
+                                                    best = xi
+                                            elif direction_key == 'right' and xi > px_off + eps:
+                                                if best is None or xi < best:
+                                                    best = xi
+                    return best
+
+                end_coord = ray_intersection_any_polygon(
+                    sample_x, sample_y, inter_key,
+                    band_half=wall_thickness / 2.0, samples=5
+                )
+
+            if end_coord is not None:
+                print(f"    ✓ Край полигона найден: {inter_key}={end_coord:.1f}. Строим до него")
+                # Пересчитываем смещения относительно текущего bbox
+                if orientation == 'horizontal':
+                    if edge_side == 'left':
+                        offset_x = start_junction.x - bbox['x']
+                        offset_y = start_junction.y - (bbox['y'] + bbox['height'] / 2)
+                    else:
+                        offset_x = start_junction.x - (bbox['x'] + bbox['width'])
+                        offset_y = start_junction.y - (bbox['y'] + bbox['height'] / 2)
+                    start_x = start_junction.x
+                    # Делаем сегмент на 1px длиннее в сторону направления
+                    pixel_extend = 1.0
+                    if inter_key == 'right':
+                        end_x = end_coord + pixel_extend
+                    elif inter_key == 'left':
+                        end_x = end_coord - pixel_extend
+                    else:
+                        end_x = end_coord
+                    synthetic_end = JunctionPoint(x=end_x, y=start_junction.y, junction_type=start_junction.junction_type, id=-(100000 + start_junction.id))
+                    x = min(start_x, end_x)
+                    y = (start_junction.y - offset_y) - wall_thickness / 2
+                    width = abs(end_x - start_x)
+                    height = wall_thickness
+                else:
+                    if edge_side == 'top':
+                        offset_x = start_junction.x - (bbox['x'] + bbox['width'] / 2)
+                        offset_y = start_junction.y - bbox['y']
+                    else:
+                        offset_x = start_junction.x - (bbox['x'] + bbox['width'] / 2)
+                        offset_y = start_junction.y - (bbox['y'] + bbox['height'])
+                    start_y = start_junction.y
+                    # Делаем сегмент на 1px длиннее в сторону направления
+                    pixel_extend = 1.0
+                    if inter_key == 'down':
+                        end_y = end_coord + pixel_extend
+                    elif inter_key == 'up':
+                        end_y = end_coord - pixel_extend
+                    else:
+                        end_y = end_coord
+                    synthetic_end = JunctionPoint(x=start_junction.x, y=end_y, junction_type=start_junction.junction_type, id=-(100000 + start_junction.id))
+                    x = (start_junction.x - offset_x) - wall_thickness / 2
+                    adjusted_end_y = end_y + offset_y
+                    y = min(start_y, adjusted_end_y)
+                    width = wall_thickness
+                    height = abs(adjusted_end_y - start_y)
+
+                bbox_result = {
+                    'x': x,
+                    'y': y,
+                    'width': width,
+                    'height': height,
+                    'orientation': orientation
+                }
+
+                adjusted_start_junction = JunctionPoint(
+                    x=start_junction.x - offset_x,
+                    y=start_junction.y - offset_y,
+                    junction_type=start_junction.junction_type,
+                    id=start_junction.id
+                )
+
+                segment_id = f"wall_{opening_id}_{edge_side}_{start_junction.id}_to_{synthetic_end.id}_edge"
+                wall_segment = WallSegmentFromOpening(
+                    segment_id=segment_id,
+                    opening_id=opening_id,
+                    edge_side=edge_side,
+                    start_junction=adjusted_start_junction,
+                    end_junction=synthetic_end,
+                    orientation=orientation,
+                    bbox=bbox_result
+                )
+                wall_segments.append(wall_segment)
+                if json_data:
+                    add_wall_segment_from_opening_to_json(json_data, wall_segment)
+            else:
+                print(f"    Нет пересечения с краем полигона — строим fallback сегмент длиной wall_thickness")
+
+                # Пересчитываем смещения относительно текущего bbox
+                if orientation == 'horizontal':
+                    if edge_side == 'left':
+                        offset_x = start_junction.x - bbox['x']
+                        offset_y = start_junction.y - (bbox['y'] + bbox['height'] / 2)
+                    else:
+                        offset_x = start_junction.x - (bbox['x'] + bbox['width'])
+                        offset_y = start_junction.y - (bbox['y'] + bbox['height'] / 2)
+                    start_x = start_junction.x
+                    end_x = start_x + (-wall_thickness if edge_side == 'left' else wall_thickness)
+                    synthetic_end = JunctionPoint(x=end_x, y=start_junction.y, junction_type=start_junction.junction_type, id=-(100000 + start_junction.id))
+                    x = min(start_x, end_x)
+                    y = (start_junction.y - offset_y) - wall_thickness / 2
+                    width = abs(end_x - start_x)
+                    height = wall_thickness
+                else:
+                    if edge_side == 'top':
+                        offset_x = start_junction.x - (bbox['x'] + bbox['width'] / 2)
+                        offset_y = start_junction.y - bbox['y']
+                    else:
+                        offset_x = start_junction.x - (bbox['x'] + bbox['width'] / 2)
+                        offset_y = start_junction.y - (bbox['y'] + bbox['height'])
+                    start_y = start_junction.y
+                    end_y = start_y + (-wall_thickness if edge_side == 'top' else wall_thickness)
+                    synthetic_end = JunctionPoint(x=start_junction.x, y=end_y, junction_type=start_junction.junction_type, id=-(100000 + start_junction.id))
+                    x = (start_junction.x - offset_x) - wall_thickness / 2
+                    adjusted_end_y = end_y + offset_y
+                    y = min(start_y, adjusted_end_y)
+                    width = wall_thickness
+                    height = abs(adjusted_end_y - start_y)
+
+                bbox_result = {
+                    'x': x,
+                    'y': y,
+                    'width': width,
+                    'height': height,
+                    'orientation': orientation
+                }
+
+                adjusted_start_junction = JunctionPoint(
+                    x=start_junction.x - offset_x,
+                    y=start_junction.y - offset_y,
+                    junction_type=start_junction.junction_type,
+                    id=start_junction.id
+                )
+
+                segment_id = f"wall_{opening_id}_{edge_side}_{start_junction.id}_to_{synthetic_end.id}_fallback"
+                wall_segment = WallSegmentFromOpening(
+                    segment_id=segment_id,
+                    opening_id=opening_id,
+                    edge_side=edge_side,
+                    start_junction=adjusted_start_junction,
+                    end_junction=synthetic_end,
+                    orientation=orientation,
+                    bbox=bbox_result
+                )
+                wall_segments.append(wall_segment)
+
+                if json_data:
+                    add_wall_segment_from_opening_to_json(json_data, wall_segment)
     
     return wall_segments
 
@@ -1184,7 +1453,7 @@ def process_openings_with_junctions(data: Dict, wall_thickness: float, json_data
         print(f"  Вызов construct_wall_segment_from_opening для проема {opening_id}")
         # Construct wall segments from this opening
         wall_segments = construct_wall_segment_from_opening(
-            opening_with_junction, junctions, wall_thickness, openings, json_data
+            opening_with_junction, junctions, wall_thickness, openings, json_data, data.get('wall_polygons', [])
         )
 
         # Добавляем проем в JSON с обновленным bbox после обработки
@@ -1950,6 +2219,57 @@ def analyze_junction_types_with_thickness(junctions: List[JunctionPoint], data: 
     for jtype, count in type_counts.items():
         print(f"  {jtype}: {count}")
     
+    return junctions
+
+def override_junction_types_with_connectivity(
+    junctions: List[JunctionPoint],
+    wall_segments: List[WallSegmentFromOpening],
+    junction_wall_segments: List[WallSegmentFromJunction],
+    wall_thickness: float,
+) -> List[JunctionPoint]:
+    """
+    Если полигонный анализ дал unknown или только 1 направление, смотреть подключенные к узлу сегменты;
+    если есть по одному горизонтальному и вертикальному — маркировать как L.
+
+    Args:
+        junctions: Узлы с типами по полигонному анализу
+        wall_segments: Сегменты стен от проёмов
+        junction_wall_segments: Сегменты стен между узлами
+        wall_thickness: Толщина стены (для допусков)
+
+    Returns:
+        Обновлённый список узлов
+    """
+    updated = 0
+    for j in junctions:
+        # Только если ещё не L и информации по полигонам недостаточно
+        if j.detected_type != 'L' and (not j.directions or len(j.directions) <= 1):
+            # Собираем подключенные сегменты около узла
+            opening_segs, junction_segs = find_wall_segments_at_l_junction(
+                j, wall_segments, junction_wall_segments, wall_thickness / 2.0
+            )
+            all_segs = opening_segs + junction_segs
+            if not all_segs:
+                continue
+            horiz = sum(1 for s in all_segs if getattr(s, 'orientation', None) == 'horizontal')
+            vert = sum(1 for s in all_segs if getattr(s, 'orientation', None) == 'vertical')
+
+            # Если есть хотя бы один горизонтальный и один вертикальный сегмент — это L
+            if horiz >= 1 and vert >= 1:
+                prev = j.detected_type
+                j.detected_type = 'L'
+                # Обновляем направления по существующим сегментам, чтобы расширения знали, куда тянуть
+                try:
+                    j.directions = get_existing_directions_for_junction(
+                        j, wall_segments, junction_wall_segments, wall_thickness
+                    )
+                except Exception:
+                    # В крайнем случае оставляем как есть
+                    pass
+                print(f"  ✓ Переопределение типа J{j.id}: {prev} -> L (по подключенным сегментам: H={horiz}, V={vert})")
+                updated += 1
+    if updated:
+        print(f"  ✓ Переопределили тип на L по связям: {updated} узлов")
     return junctions
 
 def analyze_junction_types(wall_segments: List[WallSegmentFromOpening], junctions: List[JunctionPoint]) -> List[JunctionPoint]:
@@ -3038,6 +3358,11 @@ def visualize_polygons_opening_based_with_junction_types():
     
     junctions = parse_junctions(data)
     junctions_with_types = analyze_junction_types_with_thickness(junctions, data, wall_thickness)
+    # Гибридная коррекция типов: если по полигону тип unknown/одно направление,
+    # но рядом есть один горизонтальный и один вертикальный сегмент — помечаем как L
+    junctions_with_types = override_junction_types_with_connectivity(
+        junctions_with_types, wall_segments, [], wall_thickness
+    )
     
     # Добавляем все junctions в JSON
     for junction in junctions_with_types:
@@ -3109,6 +3434,11 @@ def visualize_polygons_opening_based_with_junction_types():
         else:
             print(f"  ✓ Добавлено {added_this_iteration} сегментов на итерации {iteration}")
     
+    # Перед обработкой L-junctions корректируем типы по подключенным сегментам
+    junctions_with_types = override_junction_types_with_connectivity(
+        junctions_with_types, wall_segments, junction_wall_segments, wall_thickness
+    )
+
     # Process L-junctions and extend original segments
     print(f"\n{'='*60}")
     print("ОБРАБОТКА L-JUNCTIONS И РАСШИРЕНИЕ ОРИГИНАЛЬНЫХ СЕГМЕНТОВ")
@@ -4471,6 +4801,12 @@ def main():
         else:
             print(f"  ✓ Добавлено {added_this_iteration} сегментов на итерации {iteration}")
     
+    # Перед обработкой L-junctions повторно скорректируем типы по фактическим связям
+    # (на этом этапе уже есть junction_wall_segments после достраивания)
+    junctions_with_types = override_junction_types_with_connectivity(
+        junctions_with_types, wall_segments, junction_wall_segments, wall_thickness
+    )
+
     # Process L-junctions and extend original segments
     print(f"\n{'='*60}")
     print("ОБРАБОТКА L-JUNCTIONS И РАСШИРЕНИЕ ОРИГИНАЛЬНЫХ СЕГМЕНТОВ")

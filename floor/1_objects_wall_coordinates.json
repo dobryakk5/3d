@@ -2,7 +2,7 @@
   "metadata": {
     "source_file": "1_objects.json",
     "wall_thickness": 22.0,
-    "timestamp": "2025-10-30T11:48:53.927038",
+    "timestamp": "2025-10-30T17:25:27.843694",
     "version": "1.0"
   },
   "junctions": [
@@ -627,7 +627,13 @@
       "detected_type": "unknown",
       "directions": [],
       "confidence": 1.0,
-      "connected_wall_segments": []
+      "connected_wall_segments": [
+        {
+          "segment_id": "wall_door_3_top_30_to_-100030_edge",
+          "segment_type": "from_openings",
+          "connection_type": "start"
+        }
+      ]
     },
     {
       "id": 31,
@@ -1009,7 +1015,7 @@
         "x": 204.5,
         "y": 738.0,
         "width": 22.0,
-        "height": 238.0,
+        "height": 237.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_7",
@@ -1031,15 +1037,15 @@
       "orientation": "vertical",
       "bbox": {
         "x": 1069.0,
-        "y": 150.0,
+        "y": 152.0,
         "width": 22.0,
-        "height": 376.0,
+        "height": 374.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "window_6",
           "original_coords": {
             "x": 1069.0,
-            "y": 150.0
+            "y": 152.0
           },
           "alignment_type": "opening"
         }
@@ -1167,6 +1173,30 @@
       "alignment_info": {}
     },
     {
+      "segment_id": "wall_door_3_top_30_to_-100030_edge",
+      "opening_id": "door_3",
+      "edge_side": "top",
+      "start_junction_id": 30,
+      "end_junction_id": -100030,
+      "orientation": "vertical",
+      "bbox": {
+        "x": 775.0,
+        "y": 717.9,
+        "width": 22.0,
+        "height": 94.10000000000002,
+        "orientation": "vertical",
+        "alignment_info": {
+          "opening_id": "door_3",
+          "original_coords": {
+            "x": 775.0,
+            "y": 717.9
+          },
+          "alignment_type": "opening"
+        }
+      },
+      "alignment_info": {}
+    },
+    {
       "segment_id": "wall_door_3_bottom_36_to_9",
       "opening_id": "door_3",
       "edge_side": "bottom",
@@ -1177,7 +1207,7 @@
         "x": 775.0,
         "y": 902.0,
         "width": 22.0,
-        "height": 75.0,
+        "height": 74.0,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "door_3",
@@ -1410,9 +1440,9 @@
       "id": "window_2",
       "type": "window",
       "bbox": {
-        "x": 287.0,
+        "x": 286.0,
         "y": 139.0,
-        "width": 155.0,
+        "width": 156.0,
         "height": 22.0
       },
       "orientation": "horizontal",
@@ -1433,7 +1463,7 @@
       "bbox": {
         "x": 622.0,
         "y": 139.0,
-        "width": 94.0,
+        "width": 97.0,
         "height": 22.0
       },
       "orientation": "horizontal",
@@ -1452,7 +1482,7 @@
       "id": "door_1",
       "type": "door",
       "bbox": {
-        "x": 623.0,
+        "x": 624.0,
         "y": 966.5,
         "width": 131.0,
         "height": 22.0
@@ -1473,7 +1503,7 @@
       "id": "door_2",
       "type": "door",
       "bbox": {
-        "x": 279.0,
+        "x": 278.0,
         "y": 966.5,
         "width": 90.0,
         "height": 22.0
@@ -1518,7 +1548,7 @@
         "x": 204.5,
         "y": 677.0,
         "width": 22.0,
-        "height": 61.0
+        "height": 62.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -1537,9 +1567,9 @@
       "type": "window",
       "bbox": {
         "x": 1069.0,
-        "y": 526.0,
+        "y": 524.0,
         "width": 22.0,
-        "height": 62.0
+        "height": 64.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -1560,7 +1590,7 @@
         "x": 1069.0,
         "y": 633.0,
         "width": 22.0,
-        "height": 63.0
+        "height": 62.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -1578,9 +1608,9 @@
       "id": "window_1",
       "type": "window",
       "bbox": {
-        "x": 821.0,
+        "x": 820.0,
         "y": 1080.0,
-        "width": 225.0,
+        "width": 227.0,
         "height": 22.0
       },
       "orientation": "horizontal",
@@ -1602,7 +1632,7 @@
         "x": 775.0,
         "y": 812.0,
         "width": 22.0,
-        "height": 90.0
+        "height": 91.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -1620,9 +1650,9 @@
       "id": "door_4",
       "type": "door",
       "bbox": {
-        "x": 279.0,
+        "x": 278.0,
         "y": 604.5,
-        "width": 69.0,
+        "width": 70.0,
         "height": 22.0
       },
       "orientation": "horizontal",
@@ -1644,7 +1674,7 @@
         "x": 603.0,
         "y": 657.0,
         "width": 22.0,
-        "height": 70.0
+        "height": 71.0
       },
       "orientation": "vertical",
       "edge_junctions": [
@@ -1741,7 +1771,7 @@
   ],
   "statistics": {
     "total_junctions": 36,
-    "total_wall_segments_from_openings": 46,
+    "total_wall_segments_from_openings": 48,
     "total_wall_segments_from_junctions": 10,
     "total_openings": 12,
     "total_pillar_squares": 2,
