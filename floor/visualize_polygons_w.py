@@ -988,84 +988,29 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
         else:  # down
             search_x, search_y = bbox['x'] + bbox['width'] / 2, bbox['y'] + bbox['height']
         
-        # Ищем ближайший junction в направлении от края проема
+        # Ищем ближайший junction в направлении от края проема (без изменения bbox проема)
         nearest_junction = find_nearest_junction_in_direction_from_point(
             search_x, search_y, direction, junctions, wall_thickness / 2.0
         )
-        
-        
-        # ИСПРАВЛЕНИЕ: Всегда ищем junctions в пределах половины толщины стены от края проема,
-        # независимо от того, найден ли nearest_junction в строгом направлении
-        if True:
-            # Ищем ближайший junction в пределах половины толщины стены от края проема
-            # независимо от направления
-            closest_junction = None
-            min_distance = float('inf')
-            
-            for junction in junctions:
-                # Проверяем расстояние от края проема до junction
-                if direction == 'left':
-                    distance = abs(search_x - junction.x)
-                    vertical_alignment = abs(search_y - junction.y) <= wall_thickness / 2.0
-                elif direction == 'right':
-                    distance = abs(junction.x - search_x)
-                    vertical_alignment = abs(search_y - junction.y) <= wall_thickness / 2.0
-                elif direction == 'up':
-                    distance = abs(search_y - junction.y)
-                    horizontal_alignment = abs(search_x - junction.x) <= wall_thickness / 2.0
-                else:  # down
-                    distance = abs(junction.y - search_y)
-                    horizontal_alignment = abs(search_x - junction.x) <= wall_thickness / 2.0
-                
-                # Проверяем, что junction находится в пределах половины толщины стены
-                is_within_tolerance = distance <= wall_thickness / 2.0
-                alignment_check = vertical_alignment if direction in ['left', 'right'] else horizontal_alignment
-                
-                
-                if is_within_tolerance and alignment_check and distance < min_distance:
-                    min_distance = distance
-                    closest_junction = junction
-            
-            # Если нашли такой junction, используем его
-            if closest_junction:
-                nearest_junction = closest_junction
-        
-        # Сначала проверяем, есть ли рядом junction в пределах половины толщины стены
-        if nearest_junction:
-            # Проверяем, находится ли junction в пределах половины толщины стены от края проема
-            if direction == 'left':
-                junction_near_edge = abs(nearest_junction.x - bbox['x']) <= wall_thickness / 2.0
-            elif direction == 'right':
-                junction_near_edge = abs(nearest_junction.x - (bbox['x'] + bbox['width'])) <= wall_thickness / 2.0
-            elif direction == 'up':
-                junction_near_edge = abs(nearest_junction.y - bbox['y']) <= wall_thickness / 2.0
-            else:  # down
-                junction_near_edge = abs(nearest_junction.y - (bbox['y'] + bbox['height'])) <= wall_thickness / 2.0
-            
-            if junction_near_edge:
-                # Сдвигаем край проема до junction
-                print(f"    Сдвигаем край проема {opening_id} до junction {nearest_junction.id} в направлении {direction}")
-                # Изменяем bbox проема, чтобы его край доходил до junction
-                adjusted_bbox = extend_opening_to_junction(
-                    {'id': opening_id, 'bbox': bbox},
-                    direction,
-                    nearest_junction
-                )
-                # Обновляем bbox проема
-                opening_with_junction.bbox = adjusted_bbox
-                print(f"    Проем {opening_id} изменен: {bbox} -> {adjusted_bbox}")
-                bbox = adjusted_bbox  # Обновляем локальную переменную для дальнейших проверок
-                
-                # ДОБАВЛЕНО: После сдвига края проема, проверяем наличие соседних проемов еще раз
-                temp_opening = {
-                    'id': opening_id,
-                    'bbox': bbox
-                }
-                print(f"    DEBUG: После сдвига края проема {opening_id}, bbox={bbox}")
-                nearby_opening_after_shift = find_nearby_opening_in_direction(temp_opening, direction, all_openings, wall_thickness)
-                if nearby_opening_after_shift:
-                    print(f"    После сдвига края найден соседний проем {nearby_opening_after_shift.get('id')}, стена не создается")
-                    continue  # Не создаем стену, если есть соседний проем
+        # Вычисляем "малый зазор" от края проема до ближайшего узла по направлению
+        small_gap_junction = None
+        if nearest_junction is not None:
+            if direction == 'left' and nearest_junction.x < search_x:
+                gap = search_x - nearest_junction.x
+                if gap <= wall_thickness:
+                    small_gap_junction = nearest_junction
+            elif direction == 'right' and nearest_junction.x > search_x:
+                gap = nearest_junction.x - search_x
+                if gap <= wall_thickness:
+                    small_gap_junction = nearest_junction
+            elif direction == 'up' and nearest_junction.y < search_y:
+                gap = search_y - nearest_junction.y
+                if gap <= wall_thickness:
+                    small_gap_junction = nearest_junction
+            elif direction == 'down' and nearest_junction.y > search_y:
+                gap = nearest_junction.y - search_y
+                if gap <= wall_thickness:
+                    small_gap_junction = nearest_junction
         
         # Теперь проверяем, есть ли рядом другой проем
         nearby_opening = None
@@ -1085,8 +1030,13 @@ def construct_wall_segment_from_opening(opening_with_junction: OpeningWithJuncti
         else:
             print(f"    Соседний проем не найден, создаем стену")
         
-        # Find the next junction in the direction
-        end_junction = find_next_junction_in_direction(start_junction, direction, junctions, wall_thickness / 2.0)
+        # Выбираем конечный узел: сначала пробуем малый зазор от края проема, иначе обычный ближайший узел от junction
+        if small_gap_junction is not None:
+            end_junction = small_gap_junction
+            print(f"    Строим короткий сегмент от края проема до J{end_junction.id} (gap <= wall_thickness)")
+        else:
+            # Find the next junction in the direction from the start junction on the opening edge
+            end_junction = find_next_junction_in_direction(start_junction, direction, junctions, wall_thickness / 2.0)
 
         if end_junction:
             # ИСПРАВЛЕНИЕ: Пересчитываем offset после того, как bbox мог быть изменен
@@ -1495,6 +1445,92 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint],
         analysis = analyze_polygon_extensions_with_thickness({'x': j.x, 'y': j.y}, polygon['vertices'], wall_thickness)
         intersections = analysis.get('intersections', {})
         return intersections.get(direction)
+
+    def try_bridge_small_gap(junc: JunctionPoint, dirn: str) -> bool:
+        """
+        Пытается вытянуть ближайший bbox стены, ориентированный в указанную сторону,
+        если зазор <= толщины стены. Меняет только длину сегмента, толщину не меняет.
+        """
+        align_tol = wall_thickness * 0.75
+        max_gap = wall_thickness * 1.25
+        best = None  # (gap, segment, orientation)
+
+        def aligned_x(seg):
+            return abs((seg.bbox['x'] + seg.bbox['width'] / 2) - junc.x) <= align_tol
+
+        def aligned_y(seg):
+            return abs((seg.bbox['y'] + seg.bbox['height'] / 2) - junc.y) <= align_tol
+
+        # Собираем кандидатов по ориентации и направлению
+        all_segs = wall_segments + junction_wall_segments
+        for seg in all_segs:
+            if dirn in ['up', 'down'] and seg.orientation == 'vertical' and aligned_x(seg):
+                top = seg.bbox['y']
+                bottom = seg.bbox['y'] + seg.bbox['height']
+                if dirn == 'down':
+                    # Сегмент ниже junction: верхняя грань >= j.y
+                    if top >= junc.y:
+                        gap = top - junc.y
+                        if 0 <= gap <= max_gap:
+                            if best is None or gap < best[0]:
+                                best = (gap, seg, 'vertical')
+                else:  # up
+                    # Сегмент выше junction: нижняя грань <= j.y
+                    if bottom <= junc.y:
+                        gap = junc.y - bottom
+                        if 0 <= gap <= max_gap:
+                            if best is None or gap < best[0]:
+                                best = (gap, seg, 'vertical')
+            elif dirn in ['left', 'right'] and seg.orientation == 'horizontal' and aligned_y(seg):
+                left = seg.bbox['x']
+                right = seg.bbox['x'] + seg.bbox['width']
+                if dirn == 'right':
+                    # Сегмент справа от junction: левая грань >= j.x
+                    if left >= junc.x:
+                        gap = left - junc.x
+                        if 0 <= gap <= max_gap:
+                            if best is None or gap < best[0]:
+                                best = (gap, seg, 'horizontal')
+                else:  # left
+                    # Сегмент слева от junction: правая грань <= j.x
+                    if right <= junc.x:
+                        gap = junc.x - right
+                        if 0 <= gap <= max_gap:
+                            if best is None or gap < best[0]:
+                                best = (gap, seg, 'horizontal')
+
+        if best is None:
+            return False
+
+        gap, seg, orient = best
+        original = seg.bbox.copy()
+        if orient == 'vertical':
+            # Продлеваем вертикальный сегмент по Y-только
+            if dirn == 'down':
+                # Поднять верхнюю грань до j.y
+                new_y = junc.y
+                seg.bbox['height'] = (seg.bbox['y'] + seg.bbox['height']) - new_y
+                seg.bbox['y'] = new_y
+            else:  # up
+                # Опустить нижнюю грань до j.y
+                bottom = seg.bbox['y'] + seg.bbox['height']
+                seg.bbox['height'] = junc.y - seg.bbox['y']
+                # y не меняется
+            print(f"    ✓ Вытянули вертикальный сегмент {seg.segment_id} на {gap:.1f}px к J{junc.id} ({dirn}); bbox {original} -> {seg.bbox}")
+            return True
+        else:
+            # Продлеваем горизонтальный сегмент по X-только
+            if dirn == 'right':
+                # Сдвигаем левую грань до j.x
+                right = seg.bbox['x'] + seg.bbox['width']
+                seg.bbox['width'] = right - junc.x
+                seg.bbox['x'] = junc.x
+            else:  # left
+                # Сдвигаем правую грань до j.x
+                seg.bbox['width'] = junc.x - seg.bbox['x']
+                # x не меняется
+            print(f"    ✓ Вытянули горизонтальный сегмент {seg.segment_id} на {gap:.1f}px к J{junc.id} ({dirn}); bbox {original} -> {seg.bbox}")
+            return True
     
     for junction in junctions:
         # Получаем существующие направления для этого junction
@@ -1593,9 +1629,95 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint],
                 break
 
             if not created:
-                # Если нет подходящего узла — и если от junction действительно идет полигон,
+                # Попытка: вытянуть ближайший bbox стены, ориентированный в эту сторону
+                # (увеличиваем длину, не меняя толщину)
+                def try_bridge_small_gap(junc: JunctionPoint, dirn: str) -> bool:
+                    align_tol = wall_thickness / 2.0
+                    max_gap = wall_thickness
+                    best = None  # (gap, segment, orientation)
+
+                    def aligned_x(seg):
+                        return abs((seg.bbox['x'] + seg.bbox['width'] / 2) - junc.x) <= align_tol
+
+                    def aligned_y(seg):
+                        return abs((seg.bbox['y'] + seg.bbox['height'] / 2) - junc.y) <= align_tol
+
+                    # Собираем кандидатов по ориентации и направлению
+                    all_segs = wall_segments + junction_wall_segments
+                    for seg in all_segs:
+                        if dirn in ['up', 'down'] and seg.orientation == 'vertical' and aligned_x(seg):
+                            top = seg.bbox['y']
+                            bottom = seg.bbox['y'] + seg.bbox['height']
+                            if dirn == 'down':
+                                # Сегмент ниже junction: верхняя грань >= j.y
+                                if top >= junc.y:
+                                    gap = top - junc.y
+                                    if 0 <= gap <= max_gap:
+                                        if best is None or gap < best[0]:
+                                            best = (gap, seg, 'vertical')
+                            else:  # up
+                                # Сегмент выше junction: нижняя грань <= j.y
+                                if bottom <= junc.y:
+                                    gap = junc.y - bottom
+                                    if 0 <= gap <= max_gap:
+                                        if best is None or gap < best[0]:
+                                            best = (gap, seg, 'vertical')
+                        elif dirn in ['left', 'right'] and seg.orientation == 'horizontal' and aligned_y(seg):
+                            left = seg.bbox['x']
+                            right = seg.bbox['x'] + seg.bbox['width']
+                            if dirn == 'right':
+                                # Сегмент справа от junction: левая грань >= j.x
+                                if left >= junc.x:
+                                    gap = left - junc.x
+                                    if 0 <= gap <= max_gap:
+                                        if best is None or gap < best[0]:
+                                            best = (gap, seg, 'horizontal')
+                            else:  # left
+                                # Сегмент слева от junction: правая грань <= j.x
+                                if right <= junc.x:
+                                    gap = junc.x - right
+                                    if 0 <= gap <= max_gap:
+                                        if best is None or gap < best[0]:
+                                            best = (gap, seg, 'horizontal')
+
+                    if best is None:
+                        return False
+
+                    gap, seg, orient = best
+                    original = seg.bbox.copy()
+                    if orient == 'vertical':
+                        # Продлеваем вертикальный сегмент по Y-только
+                        if dirn == 'down':
+                            # Поднять верхнюю грань до j.y
+                            new_y = junc.y
+                            seg.bbox['height'] = (seg.bbox['y'] + seg.bbox['height']) - new_y
+                            seg.bbox['y'] = new_y
+                        else:  # up
+                            # Опустить нижнюю грань до j.y
+                            bottom = seg.bbox['y'] + seg.bbox['height']
+                            seg.bbox['height'] = junc.y - seg.bbox['y']
+                            # y не меняется
+                        print(f"    ✓ Вытянули вертикальный сегмент {seg.segment_id} на {gap:.1f}px к J{junc.id} ({dirn}); bbox {original} -> {seg.bbox}")
+                        return True
+                    else:
+                        # Продлеваем горизонтальный сегмент по X-только
+                        if dirn == 'right':
+                            # Сдвигаем левую грань до j.x
+                            right = seg.bbox['x'] + seg.bbox['width']
+                            seg.bbox['width'] = right - junc.x
+                            seg.bbox['x'] = junc.x
+                        else:  # left
+                            # Сдвигаем правую грань до j.x
+                            seg.bbox['width'] = junc.x - seg.bbox['x']
+                            # x не меняется
+                        print(f"    ✓ Вытянули горизонтальный сегмент {seg.segment_id} на {gap:.1f}px к J{junc.id} ({dirn}); bbox {original} -> {seg.bbox}")
+                        return True
+
+                if try_bridge_small_gap(junction, direction):
+                    created = True
+                # Если не удалось вытянуть ближайший bbox, и если от junction действительно идет полигон,
                 # продолжаем до края полигона, создавая сегмент до границы
-                if polygon_edge_coord is not None:
+                elif polygon_edge_coord is not None:
                     print(f"    → Нет подходящего узла; создаем сегмент до края полигона в направлении {direction}")
 
                     # Создаем виртуальную конечную точку на границе полигона
@@ -1633,6 +1755,11 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint],
                     # Добавляем виртуальный узел в JSON, чтобы привязки работали корректно
                     if json_data is not None:
                         add_junction_to_json(json_data, virtual_end)
+                    # Включаем виртуальный узел в общий список узлов для последующих проходов (бриджинг и т.п.)
+                    try:
+                        all_junctions.append(virtual_end)
+                    except Exception:
+                        pass
 
                     # Создаем bbox для сегмента до края полигона
                     bbox = create_bbox_from_junctions(junction, virtual_end, orientation, wall_thickness)
@@ -1654,6 +1781,18 @@ def build_missing_wall_segments_for_junctions(junctions: List[JunctionPoint],
                     print(f"    ✓ Создан сегмент от J{junction.id} до края полигона ({direction})")
                 else:
                     print(f"    ✗ Не удалось подобрать подходящий узел для J{junction.id} в направлении {direction}")
+
+        # Дополнительный проход: если по какому-либо направлению (включая те, что не были 'значимыми')
+        # есть малый зазор <= толщины стены, пытаемся вытянуть ближайший ориентированный сегмент
+        # Это покрывает случай J19→down, где gap < wall_thickness
+        for direction_all in ['left', 'right', 'up', 'down']:
+            # Пропускаем, если уже существует сегмент в этом направлении
+            existing_directions = get_existing_directions_for_junction(junction, wall_segments, junction_wall_segments, wall_thickness)
+            if direction_all in existing_directions:
+                continue
+            if try_bridge_small_gap(junction, direction_all):
+                # После успешного вытягивания обновляем existing_directions и продолжаем к следующему направлению
+                continue
     
     print(f"\n  ✓ Создано {len(new_segments)} новых сегментов стен для junctions не связанных с проемами")
     return new_segments
@@ -2185,6 +2324,82 @@ def process_l_junction_extensions(junctions: List[JunctionPoint],
     
     print(f"  ✓ Расширено {extended_count} сегментов для L-junctions")
     return extended_count
+
+def bridge_small_gaps_around_all_junctions(junctions: List[JunctionPoint],
+                                          wall_segments: List[WallSegmentFromOpening],
+                                          junction_wall_segments: List[WallSegmentFromJunction],
+                                          wall_thickness: float) -> int:
+    """
+    Проход по всем junctions: если между junction и ближайшей соосной стеной
+    зазор <= толщины стены, вытягивает ближайший bbox стены по длине (толщина не меняется).
+
+    Возвращает количество модифицированных сегментов.
+    """
+    changed = 0
+    align_tol = wall_thickness * 0.75
+    max_gap = wall_thickness * 1.25
+
+    def aligned_x(seg, jx):
+        return abs((seg.bbox['x'] + seg.bbox['width'] / 2) - jx) <= align_tol
+
+    def aligned_y(seg, jy):
+        return abs((seg.bbox['y'] + seg.bbox['height'] / 2) - jy) <= align_tol
+
+    all_segs = wall_segments + junction_wall_segments
+
+    for j in junctions:
+        for dirn in ['left', 'right', 'up', 'down']:
+
+            best = None  # (gap, seg, orientation)
+            for seg in all_segs:
+                if dirn in ['up', 'down'] and seg.orientation == 'vertical' and aligned_x(seg, j.x):
+                    top = seg.bbox['y']
+                    bottom = seg.bbox['y'] + seg.bbox['height']
+                    if dirn == 'down' and top >= j.y:
+                        gap = top - j.y
+                        if 0 <= gap <= max_gap and (best is None or gap < best[0]):
+                            best = (gap, seg, 'vertical')
+                    elif dirn == 'up' and bottom <= j.y:
+                        gap = j.y - bottom
+                        if 0 <= gap <= max_gap and (best is None or gap < best[0]):
+                            best = (gap, seg, 'vertical')
+                elif dirn in ['left', 'right'] and seg.orientation == 'horizontal' and aligned_y(seg, j.y):
+                    left = seg.bbox['x']
+                    right = seg.bbox['x'] + seg.bbox['width']
+                    if dirn == 'right' and left >= j.x:
+                        gap = left - j.x
+                        if 0 <= gap <= max_gap and (best is None or gap < best[0]):
+                            best = (gap, seg, 'horizontal')
+                    elif dirn == 'left' and right <= j.x:
+                        gap = j.x - right
+                        if 0 <= gap <= max_gap and (best is None or gap < best[0]):
+                            best = (gap, seg, 'horizontal')
+
+            if best is None:
+                continue
+
+            gap, seg, orient = best
+            original = seg.bbox.copy()
+            if orient == 'vertical':
+                if dirn == 'down':
+                    new_y = j.y
+                    seg.bbox['height'] = (seg.bbox['y'] + seg.bbox['height']) - new_y
+                    seg.bbox['y'] = new_y
+                else:  # up
+                    seg.bbox['height'] = j.y - seg.bbox['y']
+                print(f"    ✓ [BRIDGE] Вытянули вертикальный сегмент {seg.segment_id} на {gap:.1f}px к J{j.id} ({dirn}); bbox {original} -> {seg.bbox}")
+            else:
+                if dirn == 'right':
+                    right = seg.bbox['x'] + seg.bbox['width']
+                    seg.bbox['width'] = right - j.x
+                    seg.bbox['x'] = j.x
+                else:  # left
+                    seg.bbox['width'] = j.x - seg.bbox['x']
+                print(f"    ✓ [BRIDGE] Вытянули горизонтальный сегмент {seg.segment_id} на {gap:.1f}px к J{j.id} ({dirn}); bbox {original} -> {seg.bbox}")
+            changed += 1
+
+    print(f"  ✓ Вытянули {changed} сегментов для закрытия малых зазоров")
+    return changed
 
 # =============================================================================
 # ФУНКЦИИ ВИЗУАЛИЗАЦИИ
@@ -2903,6 +3118,14 @@ def visualize_polygons_opening_based_with_junction_types():
         junctions_with_types, wall_segments, junction_wall_segments,
         data.get('wall_polygons', []), wall_thickness
     )
+    # Дополнительный проход: вытягивание сегментов для малых зазоров вокруг всех junctions
+    print(f"\n{'='*60}")
+    print("ЗАКРЫТИЕ МАЛЫХ ЗАЗОРОВ МЕЖДУ СОСЕДНИМИ СТЕНАМИ")
+    print(f"{'='*60}")
+    bridged = bridge_small_gaps_around_all_junctions(
+        junctions_with_types, wall_segments, junction_wall_segments, wall_thickness
+    )
+    extended_count += bridged
     
     # Обновляем статистику расширенных сегментов
     json_data["statistics"]["extended_segments"] = extended_count
