@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "source_image": "../1.jpg",
+    "source_image": "../floor/1.jpg",
     "scale_factor": 0.4126536369131574,
     "units": "pixels",
     "wall_height": 3.0,
@@ -8,7 +8,7 @@
     "door_height": 2.1,
     "window_height": 1.5,
     "window_sill_height": 1.0,
-    "timestamp": "2025-10-30T11:48:52.818722",
+    "timestamp": "2025-10-30T19:50:48.124205",
     "model_info": {
       "name": "hg_furukawa_original",
       "weights": "model_best_val_loss_var.pkl"
@@ -2240,8 +2240,250 @@
     "num_vertices": 4,
     "source": "building_extremes"
   },
-  "building_outline": null,
-  "street": null,
+  "building_outline": {
+    "id": "building_outline_1",
+    "type": "building_outline",
+    "vertices": [
+      {
+        "x": 287.0,
+        "y": 150.0,
+        "junction_name": "J13",
+        "junction_id": 13,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 215.0,
+        "y": 151.0,
+        "junction_name": "J5",
+        "junction_id": 5,
+        "junction_type": "window_left_corner",
+        "corner": 1
+      },
+      {
+        "x": 216.0,
+        "y": 220.0,
+        "junction_name": "J25",
+        "junction_id": 25,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 216.0,
+        "y": 375.0,
+        "junction_name": "J31",
+        "junction_id": 31,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 215.0,
+        "y": 616.0,
+        "junction_name": "J11",
+        "junction_id": 11,
+        "junction_type": "door_corner",
+        "corner": 0
+      },
+      {
+        "x": 216.0,
+        "y": 677.0,
+        "junction_name": "J29",
+        "junction_id": 29,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 216.0,
+        "y": 738.0,
+        "junction_name": "J35",
+        "junction_id": 35,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 216.0,
+        "y": 976.0,
+        "junction_name": "J3",
+        "junction_id": 3,
+        "junction_type": "door_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 279.0,
+        "y": 979.0,
+        "junction_name": "J17",
+        "junction_id": 17,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 369.0,
+        "y": 977.0,
+        "junction_name": "J22",
+        "junction_id": 22,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 417.0,
+        "y": 975.0,
+        "junction_name": "J10",
+        "junction_id": 10,
+        "junction_type": "wall_junction_l",
+        "corner": 0
+      },
+      {
+        "x": 623.0,
+        "y": 977.0,
+        "junction_name": "J16",
+        "junction_id": 16,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 754.0,
+        "y": 977.0,
+        "junction_name": "J23",
+        "junction_id": 23,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 787.0,
+        "y": 977.0,
+        "junction_name": "J9",
+        "junction_id": 9,
+        "junction_type": "wall_junction_cross",
+        "corner": 1
+      },
+      {
+        "x": 787.0,
+        "y": 1092.0,
+        "junction_name": "J4",
+        "junction_id": 4,
+        "junction_type": "door_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 821.0,
+        "y": 1091.0,
+        "junction_name": "J18",
+        "junction_id": 18,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 1046.0,
+        "y": 1092.0,
+        "junction_name": "J24",
+        "junction_id": 24,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 1082.0,
+        "y": 1092.0,
+        "junction_name": "J2",
+        "junction_id": 2,
+        "junction_type": "door_left_corner",
+        "corner": 1
+      },
+      {
+        "x": 1080.0,
+        "y": 696.0,
+        "junction_name": "J33",
+        "junction_id": 33,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 1081.0,
+        "y": 633.0,
+        "junction_name": "J27",
+        "junction_id": 27,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 1080.0,
+        "y": 588.0,
+        "junction_name": "J32",
+        "junction_id": 32,
+        "junction_type": "window_frame",
+        "corner": 0
+      },
+      {
+        "x": 1080.0,
+        "y": 526.0,
+        "junction_name": "J26",
+        "junction_id": 26,
+        "junction_type": "door_frame",
+        "corner": 0
+      },
+      {
+        "x": 1082.0,
+        "y": 150.0,
+        "junction_name": "J6",
+        "junction_id": 6,
+        "junction_type": "window_right_corner",
+        "corner": 1
+      },
+      {
+        "x": 716.0,
+        "y": 151.0,
+        "junction_name": "J20",
+        "junction_id": 20,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 622.0,
+        "y": 151.0,
+        "junction_name": "J14",
+        "junction_id": 14,
+        "junction_type": "wall_intersection",
+        "corner": 0
+      },
+      {
+        "x": 442.0,
+        "y": 150.0,
+        "junction_name": "J19",
+        "junction_id": 19,
+        "junction_type": "wall_end",
+        "corner": 0
+      },
+      {
+        "x": 287.0,
+        "y": 150.0,
+        "junction_name": "J13",
+        "junction_id": 13,
+        "junction_type": "wall_intersection",
+        "corner": 1
+      }
+    ],
+    "area": 748570.5,
+    "perimeter": 3615.2199097883263,
+    "num_vertices": 27,
+    "source": "junction_contour_fixed"
+  },
+  "street": {
+    "id": "street_1",
+    "junction_id": "13",
+    "junction": {
+      "x": 287.0,
+      "y": 150.0
+    },
+    "street_point": {
+      "x": 287.0,
+      "y": 121.01662480358374
+    },
+    "home_point": {
+      "x": 287.0,
+      "y": 178.98337519641626
+    },
+    "wall_thickness": 14.491687598208133,
+    "distance_to_foundation": 19.98337519641626
+  },
   "statistics": {
     "walls": 27,
     "windows": 7,
@@ -2251,7 +2493,7 @@
     "rooms": 1,
     "junctions": 36,
     "foundations": 1,
-    "building_outlines": 0,
-    "streets": 0
+    "building_outlines": 1,
+    "streets": 1
   }
 }

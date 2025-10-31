@@ -20,7 +20,7 @@ WALL_THICKNESS_PX = 22.0   # толщина стены в пикселях
 WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
 CUT_MARGIN = 0.05          # запас для гарантии пересечения
-OPENING_WIDTH_MULTIPLIER = 1.95  # масштаб ширины проёмов
+OPENING_WIDTH_MULTIPLIER = 1.90  # масштаб ширины проёмов
 WINDOW_FRAME_WIDTH = 0.05  # ширина рамки окна по периметру (м)
 
 WINDOW_BOTTOM = 0.65

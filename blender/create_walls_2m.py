@@ -3122,239 +3122,7 @@ def invert_x_coordinates(obj, center_x=None):
     for v in obj.data.vertices:
         v.co.x = 2 * center_x - v.co.x
 
-def setup_isometric_camera_and_render(output_path="isometric_view.jpg"):
-    """
-    Настраивает камеру для изометрического вида и выполняет рендер
-    
-    Args:
-        output_path: путь для сохранения изображения
-    """
-    try:
-        # Находим центр и границы всех объектов
-        min_x, max_x = float('inf'), float('-inf')
-        min_y, max_y = float('inf'), float('-inf')
-        min_z, max_z = float('inf'), float('-inf')
-        
-        # Проходим по всем меш-объектам
-        for obj in bpy.context.scene.objects:
-            if obj.type == 'MESH':
-                for vertex in obj.data.vertices:
-                    # Преобразуем координаты вершины в мировые
-                    world_coord = obj.matrix_world @ vertex.co
-                    min_x = min(min_x, world_coord.x)
-                    max_x = max(max_x, world_coord.x)
-                    min_y = min(min_y, world_coord.y)
-                    max_y = max(max_y, world_coord.y)
-                    min_z = min(min_z, world_coord.z)
-                    max_z = max(max_z, world_coord.z)
-        
-        # Вычисляем центр сцены
-        center_x = (min_x + max_x) / 2
-        center_y = (min_y + max_y) / 2
-        center_z = (min_z + max_z) / 2
-        
-        # Вычисляем размеры сцены
-        size_x = max_x - min_x
-        size_y = max_y - min_y
-        size_z = max_z - min_z
-        
-        # Определяем расстояние до камеры (чтобы все объекты помещались в кадр)
-        max_dimension = max(size_x, size_y, size_z)
-        camera_distance = max_dimension * 2.0  # Расстояние до камеры
-        
-        # Создаем камеру
-        bpy.ops.object.camera_add()
-        camera = bpy.context.active_object
-        camera.name = "IsometricCamera"
-        
-        # Устанавливаем камеру как активную
-        bpy.context.scene.camera = camera
-        
-        # Настраиваем изометрический ракурс
-        # Позиция камеры для изометрического вида (сверху-сбоку, центрируем по сцене)
-        # Используем диагональное позиционирование для классического изометрического вида
-        offset_x = camera_distance * 0.7071  # cos(45°)
-        offset_y = -camera_distance * 0.7071  # -sin(45°)
-        offset_z = camera_distance * 0.5774  # 1/sqrt(3) для правильной высоты
-        
-        camera.location = (center_x + offset_x, center_y + offset_y, center_z + offset_z)
-        
-        # Направляем камеру на центр сцены
-        # Создаем матрицу направления от камеры к центру
-        direction = Vector((center_x, center_y, center_z)) - camera.location
-        direction.normalize()
-        
-        # Используем track_to_constraint для надежного наведения камеры на центр
-        # Создаем constraint
-        constraint = camera.constraints.new(type='TRACK_TO')
-        constraint.target = None  # Будем использовать пустой объект
-        
-        # Создаем пустой объект в центре сцены для наведения
-        bpy.ops.object.empty_add(type='PLAIN_AXES', location=(center_x, center_y, center_z))
-        empty = bpy.context.active_object
-        empty.name = "CameraTarget"
-        
-        # Устанавливаем пустой объект как цель для камеры
-        constraint.target = empty
-        constraint.track_axis = 'TRACK_NEGATIVE_Z'
-        constraint.up_axis = 'UP_Y'
-        
-        # Устанавливаем тип камеры на ортографическую для лучшего изометрического вида
-        camera.data.type = 'ORTHO'
-        # Увеличиваем масштаб, чтобы гарантированно захватить всю сцену
-        camera.data.ortho_scale = max(size_x, size_y) * 1.5
-        
-        # Настраиваем параметры рендера
-        scene = bpy.context.scene
-        
-        # Устанавливаем движок рендера (EEVEE_NEXT работает быстрее в фоновом режиме)
-        scene.render.engine = 'BLENDER_EEVEE_NEXT'
-        
-        # Настраиваем параметры EEVEE_NEXT для качественного отображения текстур
-        scene.eevee.taa_render_samples = 128  # Увеличиваем количество сэмплов для лучшего качества
-        
-        # Настраиваем параметры теней для лучшего отображения текстур
-        try:
-            # Включаем тени
-            scene.eevee.use_shadows = True
-            
-            # Устанавливаем качество теней
-            if hasattr(scene.eevee, 'shadow_cube_size'):
-                scene.eevee.shadow_cube_size = '2048'  # Увеличиваем качество теней
-            if hasattr(scene.eevee, 'shadow_cascade_size'):
-                scene.eevee.shadow_cascade_size = '2048'  # Увеличиваем качество каскадных теней
-            
-            # Настраиваем параметры освещения для текстур
-            if hasattr(scene.eevee, 'shadow_softness'):
-                scene.eevee.shadow_softness = 0.2  # Мягкие тени
-            
-            # Включаем экранное пространственное затенение (SSAO) для лучшего восприятия текстур
-            if hasattr(scene.eevee, 'use_ssr'):
-                scene.eevee.use_ssr = True  # Включаем отражения
-            if hasattr(scene.eevee, 'use_sao'):
-                scene.eevee.use_sao = True  # Включаем затенение окружения
-                
-            # Настраиваем параметрыAmbient Occlusion для лучшего восприятия текстур
-            if hasattr(scene.eevee, 'gtao_distance'):
-                scene.eevee.gtao_distance = 0.2  # Расстояние для затенения
-            if hasattr(scene.eevee, 'gtao_thickness'):
-                scene.eevee.gtao_thickness = 0.1  # Толщина для затенения
-                
-        except Exception as e:
-            print(f"Предупреждение: Не удалось установить все параметры рендера EEVEE: {e}")
-            print("Используем базовые параметры")
-        
-        # Настраиваем параметры файла
-        scene.render.image_settings.file_format = 'JPEG'
-        scene.render.image_settings.quality = 90
-        scene.render.filepath = output_path
-        scene.render.image_settings.color_depth = '8'
-        
-        # Устанавливаем разрешение
-        scene.render.resolution_x = 1920
-        scene.render.resolution_y = 1080
-        scene.render.resolution_percentage = 100
-        
-        # Убеждаемся, что путь к файлу абсолютный
-        if not os.path.isabs(output_path):
-            output_path = os.path.abspath(output_path)
-            scene.render.filepath = output_path
-        
-        # Создаем директорию, если она не существует
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        # Настраиваем освещение для EEVEE_NEXT с улучшенным отображением текстур
-        # Удаляем существующее освещение
-        bpy.ops.object.select_by_type(type='LIGHT')
-        bpy.ops.object.delete()
-        
-        # Добавляем основной солнечный свет для яркого освещения текстур
-        bpy.ops.object.light_add(type='SUN')
-        sun_light = bpy.context.active_object
-        sun_light.name = "SunLight"
-        sun_light.location = (5, 5, 10)
-        sun_light.rotation_euler = (0.5, -0.5, 0.5)
-        sun_light.data.energy = 5.0  # Увеличиваем энергию для лучшей видимости текстур
-        sun_light.data.angle = 0.1  # Уменьшаем угол для более четких теней
-        
-        # Добавляем большой заполняющий свет с мягкими тенями
-        bpy.ops.object.light_add(type='AREA')
-        fill_light = bpy.context.active_object
-        fill_light.name = "FillLight"
-        fill_light.location = (0, 0, 8)
-        fill_light.rotation_euler = (0, 0, 0)
-        fill_light.data.energy = 3.0  # Увеличиваем энергию
-        fill_light.data.size = 20.0  # Увеличиваем размер для более мягкого света
-        
-        # Добавляем свет сбоку для подсветки текстур на боковых поверхностях
-        bpy.ops.object.light_add(type='AREA')
-        side_light = bpy.context.active_object
-        side_light.name = "SideLight"
-        side_light.location = (-10, 0, 5)
-        side_light.rotation_euler = (0, 1.57, 0)  # Поворот на 90 градусов
-        side_light.data.energy = 2.5  # Увеличиваем энергию для подсветки боковых поверхностей
-        side_light.data.size = 15.0  # Большой размер для мягкости
-        
-        # Добавляем второй свет сбоку с другой стороны
-        bpy.ops.object.light_add(type='AREA')
-        side_light2 = bpy.context.active_object
-        side_light2.name = "SideLight2"
-        side_light2.location = (10, 0, 5)
-        side_light2.rotation_euler = (0, -1.57, 0)  # Поворот на -90 градусов
-        side_light2.data.energy = 2.5  # Увеличиваем энергию для подсветки боковых поверхностей
-        side_light2.data.size = 15.0  # Большой размер для мягкости
-        
-        # Добавляем свет спереди для подсветки передних поверхностей
-        bpy.ops.object.light_add(type='AREA')
-        front_light = bpy.context.active_object
-        front_light.name = "FrontLight"
-        front_light.location = (0, -10, 5)
-        front_light.rotation_euler = (1.57, 0, 0)  # Направлен вперед
-        front_light.data.energy = 2.0  # Энергия для подсветки передних поверхностей
-        front_light.data.size = 15.0  # Большой размер для мягкости
-        
-        # Выделяем все объекты для рендера
-        bpy.ops.object.select_all(action='DESELECT')
-        for obj in bpy.context.scene.objects:
-            if obj.type in ('MESH', 'CAMERA', 'LIGHT'):
-                obj.select_set(True)
-                bpy.context.view_layer.objects.active = obj
-        
-        # Выполняем рендер с дополнительными параметрами для фонового режима
-        print(f"Выполняем рендер изометрического вида: {output_path}")
-        
-        # Принудительно обновляем сцену (в новой версии Blender метод update() устарел)
-        # Используем dg.update() вместо scene.update()
-        try:
-            bpy.context.view_layer.update()
-        except:
-            # Если и это не сработает, просто продолжаем
-            pass
-        
-        # Выполняем рендер
-        result = bpy.ops.render.render(write_still=True)
-        
-        # Проверяем, был ли создан файл
-        if os.path.exists(output_path):
-            print(f"Изометрический вид сохранен: {output_path}")
-            print(f"Размер файла: {os.path.getsize(output_path)} байт")
-            return True
-        else:
-            print(f"Ошибка: файл не был создан: {output_path}")
-            # Пробуем альтернативный путь
-            alt_path = os.path.splitext(output_path)[0] + "_alt.jpg"
-            scene.render.filepath = alt_path
-            bpy.ops.render.render(write_still=True)
-            if os.path.exists(alt_path):
-                print(f"Изометрический вид сохранен по альтернативному пути: {alt_path}")
-                return True
-            return False
-        
-    except Exception as e:
-        print(f"Ошибка при создании изометрического вида: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+ 
 
 def merge_external_outline_walls(wall_objects, external_wall_ids):
     """
@@ -3429,7 +3197,7 @@ def merge_external_outline_walls(wall_objects, external_wall_ids):
         traceback.print_exc()
         return None
 
-def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear_scene=True, brick_texture_path=None, render_isometric=False, show_junction_labels=True):
+def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear_scene=True, brick_texture_path=None, show_junction_labels=True):
     """
     Основная функция для создания 3D стен из JSON файла
     
@@ -3439,7 +3207,6 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         export_obj (bool): Экспортировать результат в OBJ файл (по умолчанию True)
         clear_scene (bool): Очищать сцену перед созданием стен (по умолчанию True)
         brick_texture_path (str): Путь к файлу текстуры кирпича для внешних стен
-        render_isometric (bool): Создавать изометрический рендер (по умолчанию False)
         show_junction_labels (bool): Отображать номера junctions над стенами (по умолчанию True)
     
     Returns:
@@ -3959,12 +3726,7 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
                     print("Предупреждение: Экспорт OBJ недоступен в этой версии Blender")
             print(f"Сохранено: {output_path}")
         
-        # Создаем изометрический рендер если нужно
-        if render_isometric:
-            print("Создание изометрического рендера...")
-            base_name = os.path.splitext(os.path.basename(json_path))[0]
-            isometric_path = os.path.join(os.path.dirname(json_path), f"{base_name}_isometric.jpg")
-            setup_isometric_camera_and_render(isometric_path)
+        # Изометрический рендер отключен по требованию
         
         print("=" * 60)
         print("ЗАВЕРШЕНО!")
@@ -4017,9 +3779,9 @@ if __name__ == "__main__":
         brick_texture_path = os.path.join(script_dir, "brick_texture.jpg")
         
         # Создаем 3D стены с указанной высотой и текстурой кирпича для внешних стен
-        # Также создаем изометрический рендер и отображаем номера junctions
+        # Отображаем номера junctions (изометрический рендер отключен)
         success = create_3d_walls_from_json(json_path, wall_height=3.0, export_obj=True,
-                                         brick_texture_path=brick_texture_path, render_isometric=True,
+                                         brick_texture_path=brick_texture_path,
                                          show_junction_labels=True)
         
         if success:
