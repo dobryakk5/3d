@@ -19,8 +19,8 @@ SCALE_FACTOR = 0.01        # 1 px = 1 см
 WALL_THICKNESS_PX = 22.0   # толщина стены в пикселях
 WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
-CUT_MARGIN = 0.05          # запас для гарантии пересечения
-OPENING_WIDTH_MULTIPLIER = 1.95  # масштаб ширины проёмов
+CUT_MARGIN = 0.10          # запас для гарантии пересечения
+OPENING_WIDTH_MULTIPLIER = 1.85  # масштаб ширины проёмов
 WINDOW_FRAME_WIDTH = 0.05  # ширина рамки окна по периметру (м)
 
 WINDOW_BOTTOM = 0.65
@@ -37,9 +37,11 @@ OUTPUT_NORMALS_JSON = os.path.join(SCRIPT_DIR, "mesh_normals.json")
 def _derive_defaults_from_json(json_path):
     base_dir = os.path.dirname(os.path.abspath(json_path))
     base_name = os.path.splitext(os.path.basename(json_path))[0]
+    # Извлекаем только первую часть до первого подчеркивания
+    prefix = base_name.split('_')[0]
     return {
-        'heights_obj': os.path.join(base_dir, f"{base_name}_3d.obj"),
-        'out_obj': os.path.join(base_dir, f"{base_name}_outline_with_openings.obj"),
+        'heights_obj': os.path.join(base_dir, f"{prefix}_wall_coordinates_inverted_3d.obj"),
+        'out_obj': os.path.join(base_dir, f"{prefix}_outline_with_openings.obj"),
     }
 
 def _apply_cli_overrides(argv):
