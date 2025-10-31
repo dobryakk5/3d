@@ -19,8 +19,8 @@ SCALE_FACTOR = 0.01        # 1 px = 1 см
 WALL_THICKNESS_PX = 22.0   # толщина стены в пикселях
 WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
-CUT_MARGIN = 0.10          # запас для гарантии пересечения
-OPENING_WIDTH_MULTIPLIER = 1.85  # масштаб ширины проёмов
+CUT_MARGIN = 0.00          # запас для гарантии пересечения
+OPENING_WIDTH_MULTIPLIER = 2  # масштаб ширины проёмов
 WINDOW_FRAME_WIDTH = 0.05  # ширина рамки окна по периметру (м)
 
 WINDOW_BOTTOM = 0.65
@@ -77,10 +77,8 @@ def _apply_cli_overrides(argv):
     out_obj = out_obj or derived['out_obj']
     return json_path, heights_obj, out_obj
 
-# Параметры фундамента 
-FOUNDATION_Z_OFFSET = 0.0   # верх фундамента на уровне низа здания
-FOUNDATION_THICKNESS = 0.75 # толщина фундамента в метрах
-EXPORT_LABELS_IN_OBJ = True   # при True метки-конвертируются в mesh и попадают в OBJ
+# Глобальные параметры экспорта/отладки
+EXPORT_LABELS_IN_OBJ = False   # при True метки-конвертируются в mesh и попадают в OBJ
 LABEL_Z_OFFSET = 0.05         # поднять метки на 5 см над стеной
 DEBUG_WALL_TO_VISUALIZE = None   # номер стены для визуализации её граней (None, чтобы выключить)
 
@@ -361,13 +359,14 @@ def build_detailed_outline_runs(outline_vertices, segments_with_bbox, edges_with
 
 
 def create_rectangles(data):
-    """Создаёт прямоугольники стен по угловым вершинам building_outline, используя bbox-подсказки.
+    """Создаёт прямоугольники стен по угловым вершинам building_outline (corner→corner).
 
-    Механизм:
-      - Идём от corner=1 к corner=1 по порядку обхода контура
-      - Плоскость стены берём из bbox (центр по поперечной оси), иначе средняя по вершинам
-      - Длину берём от ближайших к вершинам краёв bbox по продольной оси, иначе сами вершины
-      - Спец-правка для внутреннего правого поворота в J9
+    Упрощённая и надёжная схема без bbox-ограничителей:
+      - Строим полосу стены между соседними угловыми вершинами.
+      - Плоскость берём по середине поперечной координаты.
+      - Длину берём от v1 до v2, но ПРОДЛЕВАЕМ ТОЛЬКО КОНЕЦ участка (в сторону v2)
+        на половину толщины стены. Это устраняет «квадратный вырез» в углу и
+        формирует цельный угол стен.
     """
 
     def extract_corner_vertices(building_outline, scale_factor=SCALE_FACTOR):
@@ -383,110 +382,8 @@ def create_rectangles(data):
                 })
         return out
 
-    def _bbox_entries_from_data(data):
-        entries = []
-        def push_seg(seg):
-            bbox = seg.get('bbox') or {}
-            if not bbox:
-                return
-            entries.append({
-                'kind': 'segment',
-                'orientation': bbox.get('orientation') or seg.get('orientation'),
-                'x': float(bbox.get('x', 0.0)),
-                'y': float(bbox.get('y', 0.0)),
-                'width': float(bbox.get('width', 0.0)),
-                'height': float(bbox.get('height', 0.0)),
-                'start_junction_id': seg.get('start_junction_id'),
-                'end_junction_id': seg.get('end_junction_id'),
-            })
-        for group in ('wall_segments_from_openings', 'wall_segments_from_junctions'):
-            for seg in data.get(group, []) or []:
-                push_seg(seg)
-        for op in data.get('openings', []) or []:
-            bbox = op.get('bbox') or {}
-            if not bbox:
-                continue
-            entries.append({
-                'kind': 'opening',
-                'orientation': op.get('orientation') or bbox.get('orientation'),
-                'x': float(bbox.get('x', 0.0)),
-                'y': float(bbox.get('y', 0.0)),
-                'width': float(bbox.get('width', 0.0)),
-                'height': float(bbox.get('height', 0.0)),
-                'edge_junctions': [ej.get('junction_id') for ej in (op.get('edge_junctions') or []) if 'junction_id' in ej],
-            })
-        return entries
-
-    def _entries_touching_junction(entries, junction_id):
-        touched = []
-        for e in entries:
-            if e['kind'] == 'segment':
-                if e.get('start_junction_id') == junction_id or e.get('end_junction_id') == junction_id:
-                    touched.append(e)
-            else:
-                ejs = e.get('edge_junctions') or []
-                if junction_id in ejs:
-                    touched.append(e)
-        return touched
-
-    def _plane_from_entry(entry):
-        ori = (entry.get('orientation') or '').lower()
-        x = float(entry.get('x', 0.0)) * SCALE_FACTOR
-        y = float(entry.get('y', 0.0)) * SCALE_FACTOR
-        w = float(entry.get('width', 0.0)) * SCALE_FACTOR
-        h = float(entry.get('height', 0.0)) * SCALE_FACTOR
-        if ori == 'vertical':
-            return 'vertical', x + 0.5 * w
-        else:
-            return 'horizontal', y + 0.5 * h
-
-    def _s_extreme_near_vertex(entry, vx_m, vy_m):
-        ori = (entry.get('orientation') or '').lower()
-        x0 = float(entry.get('x', 0.0)) * SCALE_FACTOR
-        y0 = float(entry.get('y', 0.0)) * SCALE_FACTOR
-        w = float(entry.get('width', 0.0)) * SCALE_FACTOR
-        h = float(entry.get('height', 0.0)) * SCALE_FACTOR
-        if ori == 'vertical':
-            cand = [y0, y0 + h]
-            val = min(cand, key=lambda yy: abs(yy - vy_m))
-            return 'vertical', val
-        else:
-            cand = [x0, x0 + w]
-            val = min(cand, key=lambda xx: abs(xx - vx_m))
-            return 'horizontal', val
-
-    def collect_corner_guides(corner_vertices, data):
-        entries = _bbox_entries_from_data(data)
-        guides = {}
-        for v in corner_vertices:
-            j = v.get('junction_id')
-            vx, vy = float(v['x']), float(v['y'])
-            planes_h, planes_v = [], []
-            exts_h, exts_v = [], []
-            for e in _entries_touching_junction(entries, j):
-                ax, plane = _plane_from_entry(e)
-                if ax == 'horizontal':
-                    planes_h.append(float(plane))
-                else:
-                    planes_v.append(float(plane))
-                ax2, sval = _s_extreme_near_vertex(e, vx, vy)
-                if ax2 == 'horizontal':
-                    exts_h.append(float(sval))
-                else:
-                    exts_v.append(float(sval))
-            guides[j] = {
-                'horizontal_planes': planes_h,
-                'vertical_planes': planes_v,
-                'horizontal_extremes': exts_h,
-                'vertical_extremes': exts_v,
-            }
-        return guides
-
-    def pick_plane(hints, fallback):
-        return (sum(hints) / float(len(hints))) if hints else float(fallback)
-
-    def pick_extreme(hints, fallback):
-        return (min(hints, key=lambda v: abs(v - fallback))) if hints else float(fallback)
+    # Ранее здесь использовались bbox-подсказки и сложная геометрия.
+    # В новой версии полностью отказываемся от ограничителей и берём только угловые вершины.
 
     def build_wall_rectangles_from_corners(corner_vertices, guides,
                                            wall_thickness_px=WALL_THICKNESS_PX,
@@ -497,26 +394,6 @@ def create_rectangles(data):
             return rects
         half_th = float(wall_thickness_px) * float(scale_factor) / 2.0
 
-        j_to_idx = {v.get('junction_id'): idx for idx, v in enumerate(corner_vertices)}
-
-        def turn_at(jid: int):
-            if jid not in j_to_idx:
-                return 'straight'
-            idx = j_to_idx[jid]
-            prev_v = corner_vertices[(idx - 1) % n]
-            cur_v = corner_vertices[idx]
-            next_v = corner_vertices[(idx + 1) % n]
-            v1x = cur_v['x'] - prev_v['x']
-            v1y = cur_v['y'] - prev_v['y']
-            v2x = next_v['x'] - cur_v['x']
-            v2y = next_v['y'] - cur_v['y']
-            cross = v1x * v2y - v1y * v2x
-            if cross > 1e-9:
-                return 'left'
-            if cross < -1e-9:
-                return 'right'
-            return 'straight'
-
         for i in range(n):
             v1 = corner_vertices[i]
             v2 = corner_vertices[(i + 1) % n]
@@ -525,20 +402,14 @@ def create_rectangles(data):
             dx = abs(x2 - x1)
             dy = abs(y2 - y1)
             j1, j2 = v1.get('junction_id'), v2.get('junction_id')
-            g1 = guides.get(j1, {})
-            g2 = guides.get(j2, {})
 
             if dx >= dy:
-                y_plane_1 = pick_plane(g1.get('horizontal_planes', []), (y1 + y2) * 0.5)
-                y_plane_2 = pick_plane(g2.get('horizontal_planes', []), (y1 + y2) * 0.5)
-                y_plane = 0.5 * (y_plane_1 + y_plane_2) if abs(y_plane_1 - y_plane_2) < half_th else 0.5 * (y1 + y2)
-                x_edge_1 = pick_extreme(g1.get('horizontal_extremes', []), x1)
-                x_edge_2 = pick_extreme(g2.get('horizontal_extremes', []), x2)
-                # Спец-правка J9: горизонтальный, который заканчивается в J9
-                if (j2 == 9) and (turn_at(9) == 'right'):
-                    vplane = pick_plane(g2.get('vertical_planes', []), (x1 + x2) * 0.5)
-                    x_edge_2 = vplane - half_th
-                x_min, x_max = (x_edge_1, x_edge_2) if x_edge_1 <= x_edge_2 else (x_edge_2, x_edge_1)
+                # Горизонтальная стена: плоскость по середине Y; длину продлеваем на конце по X
+                y_plane = 0.5 * (y1 + y2)
+                dir_sign = 1.0 if x2 >= x1 else -1.0
+                x_start = x1
+                x_end = x2 + dir_sign * half_th
+                x_min, x_max = (x_start, x_end) if x_start <= x_end else (x_end, x_start)
                 corners = [
                     (x_min, y_plane - half_th),
                     (x_max, y_plane - half_th),
@@ -553,16 +424,12 @@ def create_rectangles(data):
                     'orientation': 'horizontal',
                 })
             else:
-                x_plane_1 = pick_plane(g1.get('vertical_planes', []), (x1 + x2) * 0.5)
-                x_plane_2 = pick_plane(g2.get('vertical_planes', []), (x1 + x2) * 0.5)
-                x_plane = 0.5 * (x_plane_1 + x_plane_2) if abs(x_plane_1 - x_plane_2) < half_th else 0.5 * (x1 + x2)
-                y_edge_1 = pick_extreme(g1.get('vertical_extremes', []), y1)
-                y_edge_2 = pick_extreme(g2.get('vertical_extremes', []), y2)
-                # Спец-правка J9: вертикальный, который начинается в J9
-                if (j1 == 9) and (turn_at(9) == 'right'):
-                    yplane = pick_plane(g1.get('horizontal_planes', []), (y1 + y2) * 0.5)
-                    y_edge_1 = yplane + half_th
-                y_min, y_max = (y_edge_1, y_edge_2) if y_edge_1 <= y_edge_2 else (y_edge_2, y_edge_1)
+                # Вертикальная стена: плоскость по середине X; длину продлеваем на конце по Y
+                x_plane = 0.5 * (x1 + x2)
+                dir_sign = 1.0 if y2 >= y1 else -1.0
+                y_start = y1
+                y_end = y2 + dir_sign * half_th
+                y_min, y_max = (y_start, y_end) if y_start <= y_end else (y_end, y_start)
                 corners = [
                     (x_plane - half_th, y_min),
                     (x_plane + half_th, y_min),
@@ -583,9 +450,9 @@ def create_rectangles(data):
         print("    ⚠️ Нет корректного building_outline — прямоугольники не созданы")
         return []
     corners = extract_corner_vertices(data['building_outline'])
-    guides = collect_corner_guides(corners, data)
+    guides = {}  # подсказки не используются в упрощённой схеме
     rectangles = build_wall_rectangles_from_corners(corners, guides)
-    print(f"    Всего прямоугольников стен: {len(rectangles)} (углы+bbox)")
+    print(f"    Всего прямоугольников стен: {len(rectangles)} (углы→углы, продление конца на 1/2 толщины)")
     return rectangles
 
 
@@ -626,60 +493,6 @@ def create_wall_mesh(rectangles, wall_height=WALL_HEIGHT):
 
     print(f"    Mesh создан: {len(vertices)} вершин, {len(faces)} граней")
     return obj
-
-
-def create_foundation(foundation_data, z_offset=FOUNDATION_Z_OFFSET, thickness=FOUNDATION_THICKNESS, scale_factor=SCALE_FACTOR):
-    """Создает 3D меш фундамента из данных JSON (как в merge_with_remesh_fine.py)."""
-    if not foundation_data or 'vertices' not in foundation_data:
-        print("    ⚠️  Данные фундамента не найдены в JSON")
-        return None
-
-    vertices_2d = foundation_data['vertices']
-
-    mesh = bpy.data.meshes.new(name="Foundation_Mesh")
-    foundation_obj = bpy.data.objects.new("Foundation", mesh)
-    bpy.context.collection.objects.link(foundation_obj)
-
-    vertices = []
-    for v in vertices_2d:
-        vertices.append((v['x'] * scale_factor, v['y'] * scale_factor, z_offset))
-    for v in vertices_2d:
-        vertices.append((v['x'] * scale_factor, v['y'] * scale_factor, z_offset - thickness))
-
-    num_verts = len(vertices_2d)
-    faces = []
-    top_face = list(range(num_verts))
-    faces.append(top_face)
-    bottom_face = list(range(num_verts, 2 * num_verts))
-    bottom_face.reverse()
-    faces.append(bottom_face)
-    for i in range(num_verts):
-        next_i = (i + 1) % num_verts
-        face = [i, next_i, next_i + num_verts, i + num_verts]
-        faces.append(face)
-
-    mesh.from_pydata(vertices, [], faces)
-    mesh.update()
-
-    bpy.context.view_layer.objects.active = foundation_obj
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    # Материал тёмно-серый
-    mat = bpy.data.materials.new(name="Foundation_Material_Dark_Gray")
-    mat.use_nodes = True
-    try:
-        mat.node_tree.nodes["Principled BSDF"].inputs[0].default_value = (0.2, 0.2, 0.2, 1.0)
-    except Exception:
-        pass
-    foundation_obj.data.materials.append(mat)
-
-    print(f"    Создан фундамент: {len(vertices)} вершин, {len(faces)} граней")
-    print(f"    Z: {z_offset}м до {z_offset - thickness}м, толщина: {thickness}м")
-
-    return foundation_obj
 
 
 def merge_duplicate_vertices(obj, distance):
@@ -727,12 +540,12 @@ def create_opening_cutters(openings, opening_heights):
         # Для гарантии пересечения делаем вырезатели больше
         if orientation == "vertical":
             # Вертикальные проемы - глубина задаёт ширину отверстия вдоль стены
-            width = WALL_THICKNESS_PX * SCALE_FACTOR * 3.0  # Толщина стены с запасом
+            width = WALL_THICKNESS_PX * SCALE_FACTOR * 3  # Толщина стены с запасом
             depth = bbox["height"] * SCALE_FACTOR * OPENING_WIDTH_MULTIPLIER
         else:
             # Горизонтальные проемы - используем ширину проема
             width = bbox["width"] * SCALE_FACTOR * OPENING_WIDTH_MULTIPLIER
-            depth = WALL_THICKNESS_PX * SCALE_FACTOR * 3.0  # Толщина стены с запасом
+            depth = WALL_THICKNESS_PX * SCALE_FACTOR * 3  # Толщина стены с запасом
 
 
         x_center = (bbox["x"] + bbox["width"] / 2.0) * SCALE_FACTOR
@@ -787,7 +600,8 @@ def create_opening_fills(openings, opening_heights,
 
     # Материалы
     mat_window = get_or_create_material("Window_Fill_Blue", (0.45, 0.75, 1.0, 1.0))
-    mat_door = get_or_create_material("Door_Fill_Dark_Brown", (0.20, 0.12, 0.05, 1.0))
+    # Внутренние двери — бежевые
+    mat_door = get_or_create_material("Door_Fill_Beige", (0.96, 0.89, 0.73, 1.0))
 
     thickness_m = float(wall_thickness_px) * float(scale_factor)
     created = []
@@ -841,7 +655,7 @@ def create_opening_fills(openings, opening_heights,
         if otype == "window":
             fill_obj.data.materials.append(mat_window)
         else:
-            # Если дверь близко к окну (< 0.5 толщины стены) — красим как окно
+            # Двери по умолчанию — бежевые; при желании можно перекрасить по близости к окну
             near = bool(doors_near_windows) and (opening.get('id') in doors_near_windows)
             fill_obj.data.materials.append(mat_window if near else mat_door)
 
@@ -1464,19 +1278,19 @@ def ensure_brick_texture_image(texture_path=None,
                 mortar_x = (x_in >= brick_w)
 
                 if mortar_x or mortar_y:
-                    r, g, b = 0.82, 0.82, 0.80  # цвет шва
+                    # серый раствор
+                    r, g, b = 0.82, 0.82, 0.82
                 else:
                     # индекс текущего кирпича в сетке
                     bx = ((x + x_shift) // (brick_w + mortar))
                     by = (y // (brick_h + mortar))
                     t = hash01(int(bx), int(by))
-                    # плавная вариация оттенка
-                    base1 = (0.63, 0.27, 0.18)
-                    base2 = (0.55, 0.22, 0.12)
-                    k = 0.35 * (t - 0.5)
-                    r = max(0.0, min(1.0, (base1[0] * (1 - t) + base2[0] * t) + k))
-                    g = max(0.0, min(1.0, (base1[1] * (1 - t) + base2[1] * t) + k * 0.5))
-                    b = max(0.0, min(1.0, (base1[2] * (1 - t) + base2[2] * t) + k * 0.25))
+                    # серые оттенки кирпича (градации серого)
+                    base1 = (0.65, 0.65, 0.65)
+                    base2 = (0.45, 0.45, 0.45)
+                    k = 0.25 * (t - 0.5)
+                    val = max(0.0, min(1.0, (base1[0] * (1 - t) + base2[0] * t) + k))
+                    r = g = b = val
 
                 idx = (y * width_adj + x) * 4
                 pixels[idx + 0] = r
@@ -1602,9 +1416,9 @@ def get_or_create_brick_material(name="OuterWall_Brick_Procedural"):
 
 
 def assign_wall_materials(obj, outline_vertices,
-                          outer_color=(1.0, 1.0, 0.0, 1.0),  # не используется для кирпича
-                          inner_color=(1.0, 1.0, 1.0, 1.0)):  # белый
-    """Назначает материал фасадам: внешние — жёлтые, внутренние — белые.
+                          outer_color=(1.0, 1.0, 0.0, 1.0),
+                          inner_color=(1.0, 1.0, 1.0, 1.0)):
+    """Назначает материал фасадам: внешние — кирпичный (серый), внутренние — белые.
 
     Робастный критерий: делаем небольшой шаг от центра грани вдоль её 2D-нормали
     и проверяем, остаётся ли точка внутри полигона внешнего контура здания.
@@ -1636,8 +1450,8 @@ def assign_wall_materials(obj, outline_vertices,
                     inside = not inside
         return inside
 
-    # Материалы: внешний — кирпич, внутренний — белый
-    outer_mat = get_or_create_brick_material("OuterWall_Brick_Procedural")
+    # Материалы: внешний — кирпичный из серой текстуры, внутренний — белый
+    outer_mat = get_or_create_brick_material("OuterWall_Brick_Gray")
     inner_mat = get_or_create_material("InnerWall_White", inner_color)
 
     mats = obj.data.materials
@@ -1988,16 +1802,7 @@ def main():
     except Exception as e:
         print(f"    ⚠️ Ошибка импорта OBJ в коллекцию: {e}")
 
-    # Создаем фундамент, если есть данные
-    foundation_obj = None
-    if 'foundation' in data:
-        print("\n[FOUNDATION] Создание фундамента из JSON")
-        foundation_obj = create_foundation(
-            data['foundation'],
-            z_offset=FOUNDATION_Z_OFFSET,
-            thickness=FOUNDATION_THICKNESS,
-            scale_factor=SCALE_FACTOR,
-        )
+    # Создание фундамента отключено по запросу
 
     print()
     print("[EXPORT] Экспорт OBJ")
@@ -2009,8 +1814,7 @@ def main():
             objects_to_export.extend(label_meshes)
         except Exception as e:
             print(f"    ⚠️  Ошибка при подготовке меток к экспорту: {e}")
-    if foundation_obj is not None:
-        objects_to_export.append(foundation_obj)
+    
     export_obj(objects_to_export, OUTPUT_OBJ)
 
     print()
@@ -2020,10 +1824,7 @@ def main():
     print(f"Стена: {wall_obj.name}")
     print(f"Вершин: {len(wall_obj.data.vertices)}")
     print(f"Граней: {len(wall_obj.data.polygons)}")
-    if foundation_obj is not None:
-        print(f"Фундамент: {foundation_obj.name} ✅")
-    else:
-        print(f"Фундамент: отсутствует")
+    # Сообщение о фундаменте удалено
     print("Перекрытие: отключено")
     
     # Проверяем результат

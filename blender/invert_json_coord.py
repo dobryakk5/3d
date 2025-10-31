@@ -138,8 +138,10 @@ def invert_json_coordinates(json_path):
             print(f"X-координаты инвертированы относительно центра {center_x}")
         
         # Создаем новый файл с инвертированными координатами
-        base_name, ext = os.path.splitext(json_path)
-        inverted_path = f"{base_name}_inverted{ext}"
+        base_name, ext = os.path.splitext(os.path.basename(json_path))
+        # Извлекаем только первую часть до первого подчеркивания
+        prefix = base_name.split('_')[0]
+        inverted_path = f"{prefix}_wall_coordinates_inverted{ext}"
         
         with open(inverted_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

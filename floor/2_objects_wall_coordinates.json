@@ -2,7 +2,7 @@
   "metadata": {
     "source_file": "2_objects.json",
     "wall_thickness": 21.0,
-    "timestamp": "2025-10-30T17:33:28.474484",
+    "timestamp": "2025-10-31T17:19:18.133465",
     "version": "1.0"
   },
   "junctions": [
@@ -1322,7 +1322,7 @@
       "bbox": {
         "x": 316.5,
         "y": 58.5,
-        "width": 83.5,
+        "width": 81.5,
         "height": 21.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -1370,7 +1370,7 @@
       "bbox": {
         "x": 316.5,
         "y": 884.5,
-        "width": 71.78571428571428,
+        "width": 70.5,
         "height": 21.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -1585,15 +1585,15 @@
       "orientation": "vertical",
       "bbox": {
         "x": 709.5,
-        "y": 438.8,
+        "y": 435.0,
         "width": 21.0,
-        "height": 19.19999999999999,
+        "height": 33.5,
         "orientation": "vertical",
         "alignment_info": {
           "opening_id": "door_4",
           "original_coords": {
             "x": 709.5,
-            "y": 438.8
+            "y": 435.0
           },
           "alignment_type": "opening"
         }
@@ -1658,7 +1658,7 @@
       "bbox": {
         "x": 888.5,
         "y": 1000.5,
-        "width": 43.5,
+        "width": 42.5,
         "height": 21.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -1943,7 +1943,7 @@
       "bbox": {
         "x": 936.5,
         "y": 409.9166666666667,
-        "width": 264.5,
+        "width": 143.5,
         "height": 21.0,
         "orientation": "horizontal",
         "alignment_info": {
@@ -2603,7 +2603,7 @@
     "total_wall_segments_from_junctions": 40,
     "total_openings": 13,
     "total_pillar_squares": 0,
-    "extended_segments": 13,
+    "extended_segments": 9,
     "has_building_outline": true,
     "has_foundation": true,
     "has_street": true

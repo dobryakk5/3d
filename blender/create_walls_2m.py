@@ -3666,7 +3666,9 @@ def create_3d_walls_from_json(json_path, wall_height=2.0, export_obj=True, clear
         if export_obj:
             print("Экспорт в OBJ формат...")
             base_name = os.path.splitext(os.path.basename(json_path))[0]
-            output_path = os.path.join(os.path.dirname(json_path), f"{base_name}_3d.obj")
+            # Извлекаем только первую часть до первого подчеркивания
+            prefix = base_name.split('_')[0]
+            output_path = os.path.join(os.path.dirname(json_path), f"{prefix}_wall_coordinates_inverted_3d.obj")
             
             # Выделяем все объекты для экспорта
             bpy.ops.object.select_all(action='DESELECT')

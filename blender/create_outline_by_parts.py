@@ -19,8 +19,8 @@ SCALE_FACTOR = 0.01        # 1 px = 1 см
 WALL_THICKNESS_PX = 22.0   # толщина стены в пикселях
 WALL_HEIGHT = 3.0          # высота стены в метрах
 MERGE_DISTANCE = 0.005     # допуск для Merge by Distance (5 мм)
-CUT_MARGIN = 0.05          # запас для гарантии пересечения
-OPENING_WIDTH_MULTIPLIER = 1.90  # масштаб ширины проёмов
+CUT_MARGIN = 0.10          # запас для гарантии пересечения
+OPENING_WIDTH_MULTIPLIER = 1.55  # масштаб ширины проёмов
 WINDOW_FRAME_WIDTH = 0.05  # ширина рамки окна по периметру (м)
 
 WINDOW_BOTTOM = 0.65
@@ -37,9 +37,11 @@ OUTPUT_NORMALS_JSON = os.path.join(SCRIPT_DIR, "mesh_normals.json")
 def _derive_defaults_from_json(json_path):
     base_dir = os.path.dirname(os.path.abspath(json_path))
     base_name = os.path.splitext(os.path.basename(json_path))[0]
+    # Извлекаем только первую часть до первого подчеркивания
+    prefix = base_name.split('_')[0]
     return {
-        'heights_obj': os.path.join(base_dir, f"{base_name}_3d.obj"),
-        'out_obj': os.path.join(base_dir, f"{base_name}_outline_with_openings.obj"),
+        'heights_obj': os.path.join(base_dir, f"{prefix}_wall_coordinates_inverted_3d.obj"),
+        'out_obj': os.path.join(base_dir, f"{prefix}_outline_with_openings.obj"),
     }
 
 def _apply_cli_overrides(argv):
@@ -359,13 +361,13 @@ def build_detailed_outline_runs(outline_vertices, segments_with_bbox, edges_with
 
 
 def create_rectangles(data):
-    """Создаёт прямоугольники стен по угловым вершинам building_outline, используя bbox-подсказки.
+    """Создаёт прямоугольники стен на основе wall_segments (не по corner vertices).
 
     Механизм:
-      - Идём от corner=1 к corner=1 по порядку обхода контура
-      - Плоскость стены берём из bbox (центр по поперечной оси), иначе средняя по вершинам
-      - Длину берём от ближайших к вершинам краёв bbox по продольной оси, иначе сами вершины
-      - Спец-правка для внутреннего правого поворота в J9
+      - Создаём прямоугольники для каждого wall_segment из wall_segments_from_openings и wall_segments_from_junctions
+      - Плоскость стены берём из bbox (центр по поперечной оси)
+      - Длину берём из bbox
+      - Это гарантирует, что окна НЕ покрываются цельными прямоугольниками
     """
 
     def extract_corner_vertices(building_outline, scale_factor=SCALE_FACTOR):
@@ -396,6 +398,7 @@ def create_rectangles(data):
                 'height': float(bbox.get('height', 0.0)),
                 'start_junction_id': seg.get('start_junction_id'),
                 'end_junction_id': seg.get('end_junction_id'),
+                'segment_id': seg.get('segment_id', ''),
             })
         for group in ('wall_segments_from_openings', 'wall_segments_from_junctions'):
             for seg in data.get(group, []) or []:
@@ -576,14 +579,66 @@ def create_rectangles(data):
                 })
         return rects
 
-    # Данные для построения
-    if ("building_outline" not in data) or (not data["building_outline"]) or ("vertices" not in data["building_outline"]) or (not data["building_outline"]["vertices"]):
-        print("    ⚠️ Нет корректного building_outline — прямоугольники не созданы")
+    # НОВАЯ ЛОГИКА: создаём прямоугольники на основе сегментов, а не углов
+    # Это гарантирует, что окна не будут покрыты цельными прямоугольниками
+
+    rectangles = []
+    half_th = WALL_THICKNESS_PX * SCALE_FACTOR / 2.0
+
+    # Получаем все wall_segments из контура
+    if ("building_outline" not in data) or (not data["building_outline"]):
+        print("    ⚠️ Нет building_outline — прямоугольники не созданы")
         return []
-    corners = extract_corner_vertices(data['building_outline'])
-    guides = collect_corner_guides(corners, data)
-    rectangles = build_wall_rectangles_from_corners(corners, guides)
-    print(f"    Всего прямоугольников стен: {len(rectangles)} (углы+bbox)")
+
+    outline_vertices = data["building_outline"]["vertices"]
+    outline_ids = {v["junction_id"] for v in outline_vertices}
+
+    # Собираем только сегменты, которые принадлежат контуру
+    for group in ('wall_segments_from_openings', 'wall_segments_from_junctions'):
+        for seg in data.get(group, []) or []:
+            if seg["start_junction_id"] in outline_ids and seg["end_junction_id"] in outline_ids:
+                bbox = seg.get('bbox')
+                if not bbox:
+                    continue
+
+                ori = bbox.get('orientation') or seg.get('orientation', 'horizontal')
+                x = float(bbox['x']) * SCALE_FACTOR
+                y = float(bbox['y']) * SCALE_FACTOR
+                w = float(bbox['width']) * SCALE_FACTOR
+                h = float(bbox['height']) * SCALE_FACTOR
+
+                if ori == 'vertical':
+                    # Вертикальная стена (протяженность вдоль Y)
+                    x_plane = x + w / 2.0
+                    y_min = y
+                    y_max = y + h
+                    corners = [
+                        (x_plane - half_th, y_min),
+                        (x_plane + half_th, y_min),
+                        (x_plane + half_th, y_max),
+                        (x_plane - half_th, y_max),
+                    ]
+                else:
+                    # Горизонтальная стена (протяженность вдоль X)
+                    y_plane = y + h / 2.0
+                    x_min = x
+                    x_max = x + w
+                    corners = [
+                        (x_min, y_plane - half_th),
+                        (x_max, y_plane - half_th),
+                        (x_max, y_plane + half_th),
+                        (x_min, y_plane + half_th),
+                    ]
+
+                rectangles.append({
+                    'corners': corners,
+                    'id': seg.get('segment_id', f"wall_{seg['start_junction_id']}_to_{seg['end_junction_id']}"),
+                    'start_junction_id': seg['start_junction_id'],
+                    'end_junction_id': seg['end_junction_id'],
+                    'orientation': ori,
+                })
+
+    print(f"    Всего прямоугольников стен: {len(rectangles)} (на основе сегментов)")
     return rectangles
 
 

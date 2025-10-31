@@ -227,7 +227,9 @@ def main():
     
     # Этап 4: Визуализация полигонов
     print_separator("ЭТАП 4/4: ВИЗУАЛИЗАЦИЯ ПОЛИГОНОВ")
-    if not run_visualization(input_json):
+    # Используем файл с координатами стен, созданный на этапе 3
+    wall_coordinates_json = f"{base_name}_wall_coordinates.json"
+    if not run_visualization(wall_coordinates_json):
         print("\n✗ Ошибка на этапе визуализации")
         return False
     

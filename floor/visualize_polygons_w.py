@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 """
-Интегрированная версия visualize_polygons_opening_based.py с анализом типов junctions
+Интегрированная версия с анализом типов junctions
 и хранением всех координат в JSON
 
 Создает SVG файл с ограничивающими прямоугольниками на основе проемов и junctions,
 а также определяет и визуализирует типы junctions (L, T, X).
-
-КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ:
-1. Стены строятся напрямую от проемов к junctions
-2. Определяются типы junctions (L, T, X)
-3. Визуализация включает цветовую кодировку типов junctions
-4. Все координаты сохраняются в JSON для последующего использования
 """
 
 import json
@@ -26,6 +20,12 @@ from collections import defaultdict
 
 # Добавляем путь к текущей директории для импорта модуля
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# =============================================================================
+# ТЕСТОВЫЙ ДЕФОЛТНЫЙ ВХОД (для ручного запуска)
+# В основном pipeline путь к файлу всегда передается аргументом
+# =============================================================================
+DEFAULT_INPUT_PATH = '2_objects.json'
 
 from improved_junction_type_analyzer import analyze_polygon_extensions_with_thickness, is_point_in_polygon
 from visualize_polygons_align import align_walls_by_openings
@@ -3361,9 +3361,19 @@ def visualize_polygons_opening_based_with_junction_types():
     print("="*60)
     
     # Параметры
-    input_path = 'plan_floor1_objects.json'
-    output_json_path = 'wall_coordinates.json'
-    output_path = 'wall_polygons.svg'
+    # В пайплайне путь приходит аргументом, иначе используем тестовый дефолт
+    input_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_INPUT_PATH
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+    
+    # Проверяем, не содержит ли уже имя файла _wall_coordinates
+    if base_name.endswith('_wall_coordinates'):
+        # Если уже содержит, используем как есть для выходных файлов
+        output_json_path = f'{base_name}.json'
+        output_path = f'{base_name.replace("_wall_coordinates", "_wall_polygons")}.svg'
+    else:
+        # Иначе добавляем суффиксы как обычно
+        output_json_path = f'{base_name}_wall_coordinates.json'
+        output_path = f'{base_name}_wall_polygons.svg'
     padding = 50  # Отступы от краев SVG
     
     # Проверяем существование входного файла
@@ -4566,10 +4576,10 @@ def replace_pillars_in_existing_svg():
     """
     Автономная функция для замены колонн в существующем SVG файле
     """
-    svg_path = 'wall_polygons.svg'
+    svg_path = output_path  # Используем уже определенный output_path
     
     # Сначала определяем толщину стен из JSON файла
-    json_path = 'plan_floor1_objects.json'
+    json_path = input_path  # Используем уже определенный input_path
     data = load_objects_data(json_path)
     if not data:
         print("✗ Ошибка: не удалось загрузить данные для определения толщины стен")
@@ -4674,21 +4684,23 @@ def copy_to_main_json(input_path: str, output_json_path: str) -> None:
 
 def main():
     """Основная функция с поддержкой аргументов командной строки"""
-    # Проверяем аргументы командной строки
-    if len(sys.argv) > 1:
-        input_path = sys.argv[1]
-        # Создаем имена выходных файлов в той же директории, что и входной файл
-        input_dir = os.path.dirname(input_path) or '.'
-        base_name = os.path.splitext(os.path.basename(input_path))[0]
+    # В пайплайне берем путь из аргумента, иначе используем тестовый дефолт
+    input_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_INPUT_PATH
+    # Создаем имена выходных файлов в той же директории, что и входной файл
+    input_dir = os.path.dirname(input_path) or '.'
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+
+    # Проверяем, не содержит ли уже имя файла _wall_coordinates
+    if base_name.endswith('_wall_coordinates'):
+        # Если уже содержит, используем как есть для выходных файлов
+        output_json_path = os.path.join(input_dir, f'{base_name}.json')
+        output_path = os.path.join(input_dir, f'{base_name.replace("_wall_coordinates", "_wall_polygons")}.svg')
+    else:
+        # Иначе добавляем суффиксы как обычно
         output_json_path = os.path.join(input_dir, f'{base_name}_wall_coordinates.json')
         output_path = os.path.join(input_dir, f'{base_name}_wall_polygons.svg')
-    else:
-        # Используем файлы по умолчанию
-        input_path = 'plan_floor1_objects.json'
-        output_json_path = 'wall_coordinates.json'
-        output_path = 'wall_polygons.svg'
     
-    print("="*60)
+    print("=" * 60)
     print("СОЗДАНИЕ ВЕКТОРНОЙ ВИЗУАЛИЗАЦИИ НА ОСНОВЕ ПРОЕМОВ С АНАЛИЗОМ ТИПОВ JUNCTIONS")
     print("="*60)
     

@@ -126,7 +126,11 @@ def build_rectangles_simplified(data):
         if dx >= dy:
             # Горизонтальная полоса: плоскость по середине Y, длина по X
             y_plane = 0.5 * (y1 + y2)
-            x_min, x_max = (x1, x2) if x1 <= x2 else (x2, x1)
+            # Продлеваем ТОЛЬКО на конце (в сторону v2) на половину толщины
+            dir_sign = 1.0 if x2 >= x1 else -1.0
+            x_start = x1
+            x_end = x2 + dir_sign * half_th
+            x_min, x_max = (x_start, x_end) if x_start <= x_end else (x_end, x_start)
             corners_xy = [
                 (x_min, y_plane - half_th),
                 (x_max, y_plane - half_th),
@@ -136,7 +140,11 @@ def build_rectangles_simplified(data):
         else:
             # Вертикальная полоса: плоскость по середине X, длина по Y
             x_plane = 0.5 * (x1 + x2)
-            y_min, y_max = (y1, y2) if y1 <= y2 else (y2, y1)
+            # Продлеваем ТОЛЬКО на конце (в сторону v2) на половину толщины
+            dir_sign = 1.0 if y2 >= y1 else -1.0
+            y_start = y1
+            y_end = y2 + dir_sign * half_th
+            y_min, y_max = (y_start, y_end) if y_start <= y_end else (y_end, y_start)
             corners_xy = [
                 (x_plane - half_th, y_min),
                 (x_plane + half_th, y_min),
@@ -431,4 +439,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

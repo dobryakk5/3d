@@ -81,18 +81,21 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     # Вычисляем префикс на основе имени входного файла (без расширения)
     BASE_NAME=$(basename "$INPUT_FILE")
     BASE_NAME="${BASE_NAME%.*}"
-    JSON_PREFIX="${BASE_NAME}_objects"
+    # Извлекаем только первую часть до первого подчеркивания
+    PREFIX=$(echo "$BASE_NAME" | cut -d'_' -f1)
+    JSON_PREFIX="${PREFIX}_objects_wall_coordinates"
     
     # Проверяем наличие префиксного файла координат стен
-    if [ ! -f "$SCRIPT_DIR/${JSON_PREFIX}_wall_coordinates.json" ]; then
-        echo "Ошибка: файл $SCRIPT_DIR/${JSON_PREFIX}_wall_coordinates.json не найден"
+    # Проверяем наличие файла координат стен (без дублирования суффикса)
+    if [ ! -f "$SCRIPT_DIR/${JSON_PREFIX}.json" ]; then
+        echo "Ошибка: файл $SCRIPT_DIR/${JSON_PREFIX}.json не найден"
         echo "Пожалуйста, сначала запустите первую часть pipeline для того же входного файла"
         exit 1
     fi
     
     # Копируем префиксный файл координат стен в директорию blender
-    echo "Копирование ${JSON_PREFIX}_wall_coordinates.json в директорию blender..."
-    cp "$SCRIPT_DIR/${JSON_PREFIX}_wall_coordinates.json" "$BLENDER_DIR/"
+    echo "Копирование ${JSON_PREFIX}.json в директорию blender..."
+    cp "$SCRIPT_DIR/${JSON_PREFIX}.json" "$BLENDER_DIR/"
     
     if [ $? -ne 0 ]; then
         echo "Ошибка: не удалось скопировать ${JSON_PREFIX}_wall_coordinates.json в директорию blender"
@@ -106,7 +109,7 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     
     # Запускаем invert_json_coord.py
     echo "Запуск invert_json_coord.py..."
-    python3 invert_json_coord.py "${JSON_PREFIX}_wall_coordinates.json"
+    python3 invert_json_coord.py "${JSON_PREFIX}.json"
     
     if [ $? -ne 0 ]; then
         echo "Ошибка: invert_json_coord.py завершился с ошибкой"
@@ -118,7 +121,7 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     # Запускаем Blender в фоновом режиме
     echo "Запуск Blender в фоновом режиме для создания 3D стен..."
     echo "Это может занять несколько минут, пожалуйста подождите..."
-    /Applications/Blender.app/Contents/MacOS/Blender --background --python create_walls_2m.py -- --json "${JSON_PREFIX}_wall_coordinates_inverted.json"
+    /Applications/Blender.app/Contents/MacOS/Blender --background --python create_walls_2m.py -- --json "${PREFIX}_wall_coordinates_inverted.json"
     blender_exit_code=$?
     
     if [ $blender_exit_code -eq 0 ]; then
@@ -128,23 +131,23 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     fi
     
     echo "Проверка результатов работы Blender..."
-    if [ -f "${JSON_PREFIX}_wall_coordinates_inverted_3d.obj" ]; then
-        echo "✓ Найден файл ${JSON_PREFIX}_wall_coordinates_inverted_3d.obj"
+    if [ -f "${PREFIX}_wall_coordinates_inverted_3d.obj" ]; then
+        echo "✓ Найден файл ${PREFIX}_wall_coordinates_inverted_3d.obj"
     else
-        echo "✗ Файл ${JSON_PREFIX}_wall_coordinates_inverted_3d.obj не найден"
+        echo "✗ Файл ${PREFIX}_wall_coordinates_inverted_3d.obj не найден"
     fi
     
-    if [ -f "${JSON_PREFIX}_wall_coordinates_inverted_isometric.jpg" ]; then
-        echo "✓ Найден файл ${JSON_PREFIX}_wall_coordinates_inverted_isometric.jpg"
+    if [ -f "${PREFIX}_wall_coordinates_inverted_isometric.jpg" ]; then
+        echo "✓ Найден файл ${PREFIX}_wall_coordinates_inverted_isometric.jpg"
     else
-        echo "✗ Файл ${JSON_PREFIX}_wall_coordinates_inverted_isometric.jpg не найден"
+        echo "✗ Файл ${PREFIX}_wall_coordinates_inverted_isometric.jpg не найден"
     fi
     
     echo "Blender в фоновом режиме выполнен"
     
     # Запускаем Blender в обычном режиме
     echo "Запуск Blender в обычном режиме для финальной визуализации..."
-    /Applications/Blender.app/Contents/MacOS/Blender --python create_outline_with_openings.py -- --json "${JSON_PREFIX}_wall_coordinates_inverted.json" --heights-obj "${JSON_PREFIX}_wall_coordinates_inverted_3d.obj" --out "${JSON_PREFIX}_outline_with_openings.obj"
+    /Applications/Blender.app/Contents/MacOS/Blender --python create_outline_with_openings.py -- --json "${PREFIX}_wall_coordinates_inverted.json" --heights-obj "${PREFIX}_wall_coordinates_inverted_3d.obj" --out "${PREFIX}_outline_with_openings.obj"
     blender_normal_exit_code=$?
     
     if [ $blender_normal_exit_code -eq 0 ]; then
@@ -155,16 +158,16 @@ if [ "$PART" = "2" ] || [ "$PART" = "both" ]; then
     fi
     
     echo "Проверка результатов работы Blender в обычном режиме..."
-    if [ -f "${JSON_PREFIX}_outline_with_openings.obj" ]; then
-        echo "✓ Найден файл ${JSON_PREFIX}_outline_with_openings.obj"
+    if [ -f "${PREFIX}_outline_with_openings.obj" ]; then
+        echo "✓ Найден файл ${PREFIX}_outline_with_openings.obj"
     else
-        echo "✗ Файл ${JSON_PREFIX}_outline_with_openings.obj не найден"
+        echo "✗ Файл ${PREFIX}_outline_with_openings.obj не найден"
     fi
     
-    if [ -f "${JSON_PREFIX}_mesh_normals.json" ]; then
-        echo "✓ Найден файл ${JSON_PREFIX}_mesh_normals.json"
+    if [ -f "${PREFIX}_mesh_normals.json" ]; then
+        echo "✓ Найден файл ${PREFIX}_mesh_normals.json"
     else
-        echo "✗ Файл ${JSON_PREFIX}_mesh_normals.json не найден"
+        echo "✗ Файл ${PREFIX}_mesh_normals.json не найден"
     fi
     
     echo "Blender в обычном режиме выполнен"
